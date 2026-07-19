@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-self-check:
+    # The deployment target remains macOS 14, but the macOS 26 SDK is needed
+    # to compile availability-guarded Liquid Glass APIs.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and verify
+        run: ./script/test.sh
