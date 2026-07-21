@@ -12,10 +12,11 @@ MediaHarbor is a modern, native media downloader for macOS powered by [yt-dlp](h
 - Liquid Glass on macOS 26 and adaptive system materials on earlier releases
 - Responsive compact-window layout that automatically collapses secondary columns
 - Live switching between English, Simplified Chinese, Traditional Chinese, and Japanese
-- Works with the broad yt-dlp supported-sites catalog
+- Works with the broad yt-dlp supported-sites catalog, including YouTube, TikTok, Bilibili, Instagram, X / Twitter, Facebook, Twitch, Vimeo, SoundCloud, and Reddit
 - Installs and updates the official `yt-dlp_macos` release on demand
 - URL drag and drop, clipboard analysis, keyboard commands, menu bar progress, and Finder reveal
-- Video quality discovery, audio-only downloads, playlists, subtitles, metadata, browser cookies, and SponsorBlock
+- Video, audio-only, and subtitle-only downloads with discovered manual/automatic caption languages, SRT/VTT/ASS output, separate files, and embedding
+- Playlists, metadata, browser cookies, and SponsorBlock; signed-in or restricted media can use cookies directly from common browsers
 - Download queue with progress, speed, ETA, cancellation, notifications, and local history
 - No accounts, ads, analytics, or bundled tracking
 
@@ -43,7 +44,7 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.0.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.1.0 ./script/build_and_run.sh --package
 ```
 
 Package mode creates versioned DMG and ZIP artifacts for the current architecture in `dist/`.
@@ -59,7 +60,6 @@ Sources/MediaHarbor/
 ├── Support/      Localization, formatting, self-checks, and visual styles
 └── Views/        SwiftUI feature surfaces and reusable components
 Documentation/    Architecture and release documentation
-Legacy/           Earlier Python implementation and assets for migration reference
 script/           Build, run, test, and packaging entry points
 ```
 
@@ -72,7 +72,6 @@ Only download media you are authorized to access. Follow applicable website term
 ## Acknowledgments
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) provides the media extraction and download engine at the heart of MediaHarbor.
-- The project was inspired in part by [bytePatrol/YT-DLP-GUI-for-MacOS](https://github.com/bytePatrol/YT-DLP-GUI-for-MacOS), then evolved into an independent native SwiftUI application with a new architecture and broader scope.
 - [SponsorBlock](https://sponsor.ajay.app/) provides community-maintained data for the optional segment-removal integration.
 
 ## License
