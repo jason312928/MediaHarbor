@@ -6,3 +6,22 @@
 xcuserdata/
 *.xcuserstate
 *.log
+
+# Local temporary output
+/tmp/
+
+# Downloaded media and local caches
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.m4v
+*.mp3
+*.m4a
+*.wav
+*.flac
+*.cache
+*.sqlite
+*.sqlite3
+*.db

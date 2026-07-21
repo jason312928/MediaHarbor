@@ -20,10 +20,31 @@ struct URLComposer: View {
                 inputRow(compact: false)
                 inputRow(compact: true)
             }
+
+            popularSites
         }
         .padding(22)
         .harborCard(cornerRadius: 24)
         .onAppear { if store.urlText.isEmpty { isFocused = true } }
+    }
+
+    private var popularSites: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.text("popular_sites", language))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SupportedPlatform.popular) { platform in
+                        Label(platform.name, systemImage: platform.symbol)
+                            .font(.caption)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(.quaternary.opacity(0.55), in: Capsule())
+                    }
+                }
+            }
+        }
     }
 
     private var title: some View {
