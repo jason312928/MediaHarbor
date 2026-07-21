@@ -4,17 +4,24 @@ struct MediaPreview: View {
     let store: DownloadStore
     let media: MediaInfo
     @Environment(\.appLanguage) private var language
+    @State private var loadedThumbnailAspectRatio: CGFloat?
 
     var body: some View {
         @Bindable var store = store
         VStack(alignment: .leading, spacing: 20) {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 20) {
-                    thumbnail.frame(width: 260, height: 146)
+                HStack(alignment: .center, spacing: 20) {
+                    thumbnail
+                        .frame(width: horizontalThumbnailSize.width, height: horizontalThumbnailSize.height)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     metadata
                 }
                 VStack(alignment: .leading, spacing: 16) {
-                    thumbnail.aspectRatio(16 / 9, contentMode: .fit)
+                    thumbnail
+                        .frame(width: compactThumbnailSize.width, height: compactThumbnailSize.height)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     metadata
                 }
             }
@@ -55,19 +62,35 @@ struct MediaPreview: View {
         }
         .padding(22)
         .harborCard(cornerRadius: 24)
+        .onChange(of: media.id) { _, _ in loadedThumbnailAspectRatio = nil }
     }
 
     private var thumbnail: some View {
-        AsyncImage(url: media.thumbnail.flatMap(URL.init(string:))) { image in
-            image.resizable().scaledToFill()
-        } placeholder: {
-            ZStack {
-                Rectangle().fill(.quaternary)
-                Image(systemName: "play.rectangle.fill").font(.largeTitle).foregroundStyle(.tertiary)
+        RemoteThumbnail(
+            urlString: media.thumbnail,
+            refererURLString: media.webpageURL,
+            contentMode: .fill,
+            onAspectRatioChange: { ratio in
+                let clamped = min(max(ratio, 0.4), 2.4)
+                if loadedThumbnailAspectRatio != clamped { loadedThumbnailAspectRatio = clamped }
             }
+        )
+    }
+
+    private var horizontalThumbnailSize: CGSize {
+        fittedThumbnailSize(maxWidth: 260, maxHeight: 220)
+    }
+
+    private var compactThumbnailSize: CGSize {
+        fittedThumbnailSize(maxWidth: 320, maxHeight: 260)
+    }
+
+    private func fittedThumbnailSize(maxWidth: CGFloat, maxHeight: CGFloat) -> CGSize {
+        let ratio = loadedThumbnailAspectRatio ?? CGFloat(media.displayAspectRatio)
+        if maxWidth / maxHeight > ratio {
+            return CGSize(width: maxHeight * ratio, height: maxHeight)
         }
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        return CGSize(width: maxWidth, height: maxWidth / ratio)
     }
 
     private var metadata: some View {

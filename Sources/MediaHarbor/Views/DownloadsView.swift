@@ -55,12 +55,9 @@ private struct DownloadRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: job.thumbnail.flatMap(URL.init(string:))) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                ZStack { Rectangle().fill(.quaternary); Image(systemName: "play.rectangle") }
-            }
+            RemoteThumbnail(urlString: job.thumbnail, refererURLString: job.sourceURL, contentMode: .fill, placeholderSymbol: "play.rectangle")
             .frame(width: 88, height: 50)
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 6) {
@@ -96,11 +93,8 @@ private struct JobDetailView: View {
         if let job {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    AsyncImage(url: job.thumbnail.flatMap(URL.init(string:))) { image in
-                        image.resizable().scaledToFit()
-                    } placeholder: {
-                        Rectangle().fill(.quaternary).aspectRatio(16 / 9, contentMode: .fit)
-                    }
+                    RemoteThumbnail(urlString: job.thumbnail, refererURLString: job.sourceURL)
+                    .aspectRatio(16 / 9, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     VStack(alignment: .leading, spacing: 7) {
