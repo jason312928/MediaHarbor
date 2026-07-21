@@ -74,6 +74,8 @@ struct MediaInfo: Codable, Identifiable, Sendable {
     let uploader: String?
     let duration: Double?
     let viewCount: Int?
+    let width: Int?
+    let height: Int?
     let extractor: String?
     let description: String?
     let formats: [MediaFormat]
@@ -82,7 +84,7 @@ struct MediaInfo: Codable, Identifiable, Sendable {
     let automaticCaptions: [String: [MediaSubtitle]]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, thumbnail, uploader, duration, formats, chapters, description, subtitles
+        case id, title, thumbnail, uploader, duration, width, height, formats, chapters, description, subtitles
         case webpageURL = "webpage_url"
         case viewCount = "view_count"
         case extractor
@@ -92,6 +94,23 @@ struct MediaInfo: Codable, Identifiable, Sendable {
     var sourceName: String {
         guard let extractor, !extractor.isEmpty else { return "Web media" }
         return extractor.split(separator: ":").first.map(String.init)?.capitalized ?? extractor
+    }
+
+    var displayAspectRatio: Double {
+        if let width, let height, width > 0, height > 0 {
+            return Self.clampedAspectRatio(Double(width) / Double(height))
+        }
+        let largestVideoFormat = formats
+            .compactMap { format -> (area: Int, ratio: Double)? in
+                guard let width = format.width, let height = format.height, width > 0, height > 0 else { return nil }
+                return (width * height, Double(width) / Double(height))
+            }
+            .max { $0.area < $1.area }
+        return Self.clampedAspectRatio(largestVideoFormat?.ratio ?? 16.0 / 9.0)
+    }
+
+    private static func clampedAspectRatio(_ ratio: Double) -> Double {
+        min(max(ratio, 0.4), 2.4)
     }
 
     var qualityChoices: [QualityChoice] {

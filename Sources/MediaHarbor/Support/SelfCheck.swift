@@ -33,7 +33,7 @@ enum SelfCheck {
             failures.append("composable command builder")
         }
 
-        let json = #"{"id":"abc","title":"Example","formats":[{"format_id":"1","height":720},{"format_id":"2","height":1080},{"format_id":"3","height":1080}],"subtitles":{"en":[{"ext":"vtt"}]},"automatic_captions":{"zh-Hans":[{"ext":"json3"}],"live_chat":[{"ext":"json"}]}}"#
+        let json = #"{"id":"abc","title":"Example","width":1080,"height":1920,"formats":[{"format_id":"1","height":720},{"format_id":"2","height":1080},{"format_id":"3","height":1080}],"subtitles":{"en":[{"ext":"vtt"}]},"automatic_captions":{"zh-Hans":[{"ext":"json3"}],"live_chat":[{"ext":"json"}]}}"#
         do {
             let info = try JSONDecoder().decode(MediaInfo.self, from: Data(json.utf8))
             if info.qualityChoices != [.video(height: 1080), .video(height: 720), .audio, .subtitles] {
@@ -41,6 +41,9 @@ enum SelfCheck {
             }
             if info.subtitleLanguages != ["en", "zh-Hans"] {
                 failures.append("subtitle discovery")
+            }
+            if abs(info.displayAspectRatio - 0.5625) > 0.0001 {
+                failures.append("portrait aspect ratio")
             }
         } catch {
             failures.append("media JSON decoding: \(error.localizedDescription)")
@@ -95,6 +98,42 @@ enum SelfCheck {
             || SupportedPlatform.matching("https://b23.tv/example")?.id != "bilibili"
             || SupportedPlatform.matching("https://www.instagram.com/reel/example")?.id != "instagram" {
             failures.append("popular platform matching")
+        }
+
+        let bilibiliThumbnail = ThumbnailRequestFactory.request(
+            urlString: "http://i1.hdslb.com/bfs/archive/example.jpg",
+            refererURLString: "https://www.bilibili.com/video/example"
+        )
+        if bilibiliThumbnail?.url?.scheme != "https"
+            || bilibiliThumbnail?.value(forHTTPHeaderField: "Referer") != "https://www.bilibili.com/"
+            || bilibiliThumbnail?.value(forHTTPHeaderField: "User-Agent") == nil {
+            failures.append("Bilibili thumbnail request")
+        }
+
+        if WindowSizing.requiredContentWidth(sidebar: false, inspector: false) != 680
+            || WindowSizing.requiredContentWidth(sidebar: true, inspector: false) != 890
+            || WindowSizing.requiredContentWidth(sidebar: false, inspector: true) != 950
+            || WindowSizing.requiredContentWidth(sidebar: true, inspector: true) != 1160 {
+            failures.append("adaptive window sizing")
+        }
+
+        let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let rightAlignedWindow = CGRect(x: 760, y: 100, width: 680, height: 600)
+        let leftExpansionOrigin = WindowSizing.anchoredOriginX(
+            oldFrame: rightAlignedWindow,
+            newWidth: 890,
+            anchor: .trailingEdge,
+            visibleFrame: visibleFrame
+        )
+        let leftAlignedWindow = CGRect(x: 0, y: 100, width: 680, height: 600)
+        let rightExpansionOrigin = WindowSizing.anchoredOriginX(
+            oldFrame: leftAlignedWindow,
+            newWidth: 950,
+            anchor: .leadingEdge,
+            visibleFrame: visibleFrame
+        )
+        if leftExpansionOrigin != 550 || rightExpansionOrigin != 0 {
+            failures.append("directional window expansion")
         }
 
         return failures

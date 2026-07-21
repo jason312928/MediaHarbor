@@ -10,11 +10,12 @@ MediaHarbor is a modern, native media downloader for macOS powered by [yt-dlp](h
 
 - Native SwiftUI interface for macOS 14 and later
 - Liquid Glass on macOS 26 and adaptive system materials on earlier releases
-- Responsive compact-window layout that automatically collapses secondary columns
+- Adaptive window expansion for the sidebar and inspector, with automatic column collapse when screen space is limited
 - Live switching between English, Simplified Chinese, Traditional Chinese, and Japanese
 - Works with the broad yt-dlp supported-sites catalog, including YouTube, TikTok, Bilibili, Instagram, X / Twitter, Facebook, Twitch, Vimeo, SoundCloud, and Reddit
 - Installs and updates the official `yt-dlp_macos` release on demand
 - URL drag and drop, clipboard analysis, keyboard commands, menu bar progress, and Finder reveal
+- Aspect-ratio-aware thumbnails for landscape and portrait media, including sites that require source-page request headers
 - Video, audio-only, and subtitle-only downloads with discovered manual/automatic caption languages, SRT/VTT/ASS output, separate files, and embedding
 - Playlists, metadata, browser cookies, and SponsorBlock; signed-in or restricted media can use cookies directly from common browsers
 - Download queue with progress, speed, ETA, cancellation, notifications, and local history
@@ -44,7 +45,7 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.1.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.2.0 ./script/build_and_run.sh --package
 ```
 
 Package mode creates versioned DMG and ZIP artifacts for the current architecture in `dist/`.

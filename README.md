@@ -10,11 +10,12 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 
 - 面向 macOS 14 及更高版本的原生 SwiftUI 界面
 - 在 macOS 26 使用 Liquid Glass，旧系统使用自适应系统材质
-- 窄窗口会自动重排内容并收起次要栏
+- 窗口会根据侧边栏和检查器自适应扩展，屏幕空间不足时自动收起次要栏
 - 应用内即时切换英文、简体中文、繁体中文和日文
 - 支持 yt-dlp 覆盖的众多媒体网站，包括 YouTube、TikTok、哔哩哔哩、Instagram、X / Twitter、Facebook、Twitch、Vimeo、SoundCloud 和 Reddit
 - 自动安装和更新官方 `yt-dlp_macos`
 - 支持链接拖放、剪贴板分析、键盘快捷键、菜单栏进度和 Finder 定位
+- 缩略图会保持横向或竖向媒体的原始比例，并兼容需要来源页请求头的站点
 - 支持视频清晰度、纯音频和仅字幕下载；可识别人工/自动字幕、筛选语言、输出 SRT/VTT/ASS，并选择保留独立字幕文件或嵌入视频
 - 支持播放列表、媒体信息、浏览器 Cookie 和 SponsorBlock；登录或受限内容可直接读取常用浏览器 Cookie
 - 下载队列提供实时进度、速度、ETA、取消、通知和本地历史记录
@@ -44,7 +45,7 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.1.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.2.0 ./script/build_and_run.sh --package
 ```
 
 打包模式会在 `dist/` 中生成当前架构的版本化 DMG 和 ZIP。
