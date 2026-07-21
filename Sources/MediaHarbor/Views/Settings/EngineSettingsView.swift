@@ -10,7 +10,9 @@ struct EngineSettingsView: View {
             Section(L10n.text("browser_cookies", language)) {
                 Picker(L10n.text("read_cookies", language), selection: $browserCookies) {
                     Text(L10n.text("none", language)).tag("None")
-                    ForEach(["Safari", "Chrome", "Firefox", "Edge"], id: \.self) { Text($0).tag($0) }
+                    ForEach(["Safari", "Chrome", "Firefox", "Edge", "Brave", "Chromium", "Opera", "Vivaldi", "Whale"], id: \.self) {
+                        Text($0).tag($0)
+                    }
                 }
                 Text(L10n.text("cookies_help", language))
                     .font(.caption).foregroundStyle(.secondary)

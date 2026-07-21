@@ -55,17 +55,18 @@ final class DownloadStore {
         selectedQuality = nil
         isAnalyzing = true
         errorMessage = nil
+        let configuration = DownloadConfiguration.current()
 
         analysisTask = Task {
             do {
-                let result = try await service.analyze(url: candidate)
+                let result = try await service.analyze(url: candidate, configuration: configuration)
                 guard !Task.isCancelled else { return }
                 media = result
                 selectedQuality = result.qualityChoices.first
                 isAnalyzing = false
             } catch {
                 guard !Task.isCancelled else { return }
-                errorMessage = error.localizedDescription
+                errorMessage = Self.message(for: error, url: candidate, configuration: configuration)
                 isAnalyzing = false
             }
         }
@@ -169,7 +170,7 @@ final class DownloadStore {
                 guard !Task.isCancelled else { return }
                 update(jobID) {
                     $0.status = .failed
-                    $0.detail = error.localizedDescription
+                    $0.detail = Self.message(for: error, url: job.sourceURL, configuration: configuration)
                 }
             }
             downloadTasks[jobID] = nil
@@ -187,6 +188,13 @@ final class DownloadStore {
         content.body = job.title
         let request = UNNotificationRequest(identifier: job.id.uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    private static func message(for error: Error, url: String, configuration: DownloadConfiguration) -> String {
+        let message = error.localizedDescription
+        guard configuration.browserCookies == "None",
+              let platform = SupportedPlatform.matching(url), platform.cookieHelpful else { return message }
+        return "\(message)\n\n\(platform.name) may require a signed-in browser session. Choose a browser in Settings › Engine and try again."
     }
 
     private static var historyURL: URL {

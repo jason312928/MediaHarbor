@@ -64,11 +64,16 @@ actor YTDLPService {
         return await version() ?? "Installed"
     }
 
-    func analyze(url: String) async throws -> MediaInfo {
+    func analyze(url: String, configuration: DownloadConfiguration) async throws -> MediaInfo {
         guard let executable = executableURL() else { throw YTDLPError.toolMissing }
+        var arguments = ["--dump-single-json", "--no-warnings", "--no-playlist"]
+        if configuration.browserCookies != "None" {
+            arguments += ["--cookies-from-browser", configuration.browserCookies.lowercased()]
+        }
+        arguments.append(url)
         let result = try await run(
             executable: executable,
-            arguments: ["--dump-single-json", "--no-warnings", "--no-playlist", url]
+            arguments: arguments
         )
         guard let data = result.stdout.data(using: .utf8) else { throw YTDLPError.invalidResponse }
         do {
@@ -97,6 +102,7 @@ actor YTDLPService {
             if let progress = Self.parseProgress(line) { onProgress(progress) }
         }
         let paths = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
+        if quality == .subtitles { return configuration.outputDirectory }
         return paths.last(where: { $0.hasPrefix("/") }) ?? configuration.outputDirectory
     }
 

@@ -12,10 +12,11 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 - 在 macOS 26 使用 Liquid Glass，旧系统使用自适应系统材质
 - 窄窗口会自动重排内容并收起次要栏
 - 应用内即时切换英文、简体中文、繁体中文和日文
-- 支持 yt-dlp 覆盖的众多媒体网站
+- 支持 yt-dlp 覆盖的众多媒体网站，包括 YouTube、TikTok、哔哩哔哩、Instagram、X / Twitter、Facebook、Twitch、Vimeo、SoundCloud 和 Reddit
 - 自动安装和更新官方 `yt-dlp_macos`
 - 支持链接拖放、剪贴板分析、键盘快捷键、菜单栏进度和 Finder 定位
-- 支持视频清晰度选择、纯音频、播放列表、字幕、媒体信息、浏览器 Cookie 和 SponsorBlock
+- 支持视频清晰度、纯音频和仅字幕下载；可识别人工/自动字幕、筛选语言、输出 SRT/VTT/ASS，并选择保留独立字幕文件或嵌入视频
+- 支持播放列表、媒体信息、浏览器 Cookie 和 SponsorBlock；登录或受限内容可直接读取常用浏览器 Cookie
 - 下载队列提供实时进度、速度、ETA、取消、通知和本地历史记录
 - 无账户、无广告、无分析追踪
 
@@ -43,7 +44,7 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.0.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.1.0 ./script/build_and_run.sh --package
 ```
 
 打包模式会在 `dist/` 中生成当前架构的版本化 DMG 和 ZIP。
@@ -59,7 +60,6 @@ Sources/MediaHarbor/
 ├── Support/      多语言、格式化、自检与视觉样式
 └── Views/        SwiftUI 功能界面与可复用组件
 Documentation/    架构和版本文档
-Legacy/           早期 Python 实现与素材，仅供迁移参考
 script/           构建、运行、测试与打包脚本
 ```
 
@@ -72,7 +72,6 @@ script/           构建、运行、测试与打包脚本
 ## 致谢
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) 是 MediaHarbor 的核心媒体解析与下载引擎。
-- 本项目的早期灵感部分来自 [bytePatrol/YT-DLP-GUI-for-MacOS](https://github.com/bytePatrol/YT-DLP-GUI-for-MacOS)，随后发展为具有全新架构和更广泛定位的独立 SwiftUI 应用。
 - [SponsorBlock](https://sponsor.ajay.app/) 为可选的片段移除功能提供社区数据。
 
 ## 许可证

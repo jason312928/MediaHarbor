@@ -51,10 +51,12 @@ private struct CoreDownloadArguments: DownloadArgumentContributor {
 
 private struct FormatArguments: DownloadArgumentContributor {
     func arguments(for request: DownloadRequest) -> [String] {
+        if case .subtitles = request.quality { return ["--skip-download"] }
         var result = ["--format", request.quality.formatSelector]
         switch request.quality {
         case .video: result += ["--merge-output-format", "mp4"]
         case .audio: result += ["--extract-audio", "--audio-format", "m4a"]
+        case .subtitles: break
         }
         return result
     }
@@ -62,20 +64,42 @@ private struct FormatArguments: DownloadArgumentContributor {
 
 private struct MetadataArguments: DownloadArgumentContributor {
     func arguments(for request: DownloadRequest) -> [String] {
-        request.configuration.embedMetadata ? ["--embed-metadata", "--embed-thumbnail"] : []
+        if case .subtitles = request.quality { return [] }
+        return request.configuration.embedMetadata ? ["--embed-metadata", "--embed-thumbnail"] : []
     }
 }
 
 private struct SubtitleArguments: DownloadArgumentContributor {
     func arguments(for request: DownloadRequest) -> [String] {
-        guard request.configuration.embedSubtitles else { return [] }
-        return ["--write-subs", "--write-auto-subs", "--sub-langs", request.configuration.subtitleLanguages, "--embed-subs"]
+        let subtitleOnly = request.quality == .subtitles
+        guard subtitleOnly || request.configuration.downloadSubtitles || request.configuration.embedSubtitles else { return [] }
+
+        var result = ["--write-subs"]
+        if request.configuration.includeAutomaticSubtitles {
+            result.append("--write-auto-subs")
+        }
+
+        let languages = request.configuration.subtitleLanguages.trimmingCharacters(in: .whitespacesAndNewlines)
+        result += ["--sub-langs", languages.isEmpty ? "all,-live_chat" : languages]
+
+        let format = request.configuration.subtitleFormat
+        if format != "best" {
+            result += ["--sub-format", "best", "--convert-subs", format]
+        }
+        if request.configuration.embedSubtitles && !subtitleOnly {
+            result.append("--embed-subs")
+            if !request.configuration.downloadSubtitles {
+                result += ["--compat-options", "no-keep-subs"]
+            }
+        }
+        return result
     }
 }
 
 private struct SponsorBlockArguments: DownloadArgumentContributor {
     func arguments(for request: DownloadRequest) -> [String] {
-        request.configuration.sponsorBlock ? ["--sponsorblock-remove", "sponsor,selfpromo,interaction"] : []
+        if case .subtitles = request.quality { return [] }
+        return request.configuration.sponsorBlock ? ["--sponsorblock-remove", "sponsor,selfpromo,interaction"] : []
     }
 }
 

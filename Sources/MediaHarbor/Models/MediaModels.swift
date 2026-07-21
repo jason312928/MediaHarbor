@@ -56,6 +56,16 @@ struct MediaChapter: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+struct MediaSubtitle: Codable, Hashable, Sendable {
+    let extensionName: String?
+    let name: String?
+
+    enum CodingKeys: String, CodingKey {
+        case extensionName = "ext"
+        case name
+    }
+}
+
 struct MediaInfo: Codable, Identifiable, Sendable {
     let id: String
     let title: String
@@ -68,12 +78,15 @@ struct MediaInfo: Codable, Identifiable, Sendable {
     let description: String?
     let formats: [MediaFormat]
     let chapters: [MediaChapter]?
+    let subtitles: [String: [MediaSubtitle]]?
+    let automaticCaptions: [String: [MediaSubtitle]]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, thumbnail, uploader, duration, formats, chapters, description
+        case id, title, thumbnail, uploader, duration, formats, chapters, description, subtitles
         case webpageURL = "webpage_url"
         case viewCount = "view_count"
         case extractor
+        case automaticCaptions = "automatic_captions"
     }
 
     var sourceName: String {
@@ -87,18 +100,33 @@ struct MediaInfo: Codable, Identifiable, Sendable {
             .prefix(6)
         var choices = heights.map { QualityChoice.video(height: $0) }
         choices.append(.audio)
+        if hasSubtitles { choices.append(.subtitles) }
         return choices
+    }
+
+    var hasSubtitles: Bool {
+        !(subtitles?.isEmpty ?? true) || !(automaticCaptions?.isEmpty ?? true)
+    }
+
+    var subtitleLanguages: [String] {
+        let manual = subtitles.map { Array($0.keys) } ?? []
+        let automatic = automaticCaptions.map { Array($0.keys) } ?? []
+        return Set(manual + automatic)
+            .filter { !$0.isEmpty && $0 != "live_chat" }
+            .sorted()
     }
 }
 
 enum QualityChoice: Hashable, Sendable, Identifiable {
     case video(height: Int)
     case audio
+    case subtitles
 
     var id: String {
         switch self {
         case .video(let height): "video-\(height)"
         case .audio: "audio"
+        case .subtitles: "subtitles"
         }
     }
 
@@ -109,6 +137,7 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
             if height >= 1440 { return "2K" }
             return "\(height)p"
         case .audio: return "Audio"
+        case .subtitles: return "Subtitles"
         }
     }
 
@@ -116,6 +145,7 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
         switch self {
         case .video(let height): height >= 2160 ? "Ultra HD" : height >= 1080 ? "High definition" : "Compact"
         case .audio: "M4A · audio only"
+        case .subtitles: "Subtitle files only"
         }
     }
 
@@ -123,6 +153,7 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
         switch self {
         case .video(let height): height >= 2160 ? "4k.tv" : "play.rectangle"
         case .audio: "waveform"
+        case .subtitles: "captions.bubble"
         }
     }
 
@@ -132,6 +163,8 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
             return "bestvideo[height<=\(height)]+bestaudio/best[height<=\(height)]"
         case .audio:
             return "bestaudio/best"
+        case .subtitles:
+            return ""
         }
     }
 }
@@ -163,7 +196,10 @@ struct DownloadConfiguration: Sendable {
     let outputDirectory: String
     let embedMetadata: Bool
     let embedSubtitles: Bool
+    let downloadSubtitles: Bool
+    let includeAutomaticSubtitles: Bool
     let subtitleLanguages: String
+    let subtitleFormat: String
     let sponsorBlock: Bool
     let browserCookies: String
     let includePlaylist: Bool
@@ -175,7 +211,10 @@ struct DownloadConfiguration: Sendable {
             outputDirectory: defaults.string(forKey: "outputDirectory") ?? defaultOutput,
             embedMetadata: defaults.object(forKey: "embedMetadata") as? Bool ?? true,
             embedSubtitles: defaults.bool(forKey: "embedSubtitles"),
+            downloadSubtitles: defaults.bool(forKey: "downloadSubtitles"),
+            includeAutomaticSubtitles: defaults.object(forKey: "includeAutomaticSubtitles") as? Bool ?? true,
             subtitleLanguages: defaults.string(forKey: "subtitleLanguages") ?? "en,zh-Hans,zh-Hant",
+            subtitleFormat: defaults.string(forKey: "subtitleFormat") ?? "srt",
             sponsorBlock: defaults.bool(forKey: "sponsorBlock"),
             browserCookies: defaults.string(forKey: "browserCookies") ?? "None",
             includePlaylist: defaults.bool(forKey: "includePlaylist")
