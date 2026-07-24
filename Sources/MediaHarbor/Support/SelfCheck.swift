@@ -33,6 +33,88 @@ enum SelfCheck {
             failures.append("composable command builder")
         }
 
+        let preparedCommand = YTDLPService.preparedDownloadArguments(
+            command,
+            temporaryDirectory: URL(fileURLWithPath: "/tmp/MediaHarborSelfCheck/job"),
+            ffmpegURL: URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        )
+        if !preparedCommand.contains("temp:/tmp/MediaHarborSelfCheck/job")
+            || !preparedCommand.contains("--ffmpeg-location")
+            || !preparedCommand.contains("/opt/homebrew/bin/ffmpeg")
+            || preparedCommand.last != "https://example.com/media" {
+            failures.append("download dependencies and temporary files")
+        }
+
+        let wordConfiguration = DownloadConfiguration(
+            outputDirectory: "/tmp/MediaHarborSelfCheck",
+            embedMetadata: false,
+            embedSubtitles: false,
+            downloadSubtitles: true,
+            includeAutomaticSubtitles: false,
+            subtitleLanguages: "ja",
+            subtitleFormat: "rtf",
+            sponsorBlock: false,
+            browserCookies: "None",
+            includePlaylist: false
+        )
+        let wordBaseCommand = YTDLPCommandBuilder().arguments(for: DownloadRequest(
+            url: "https://example.com/video",
+            quality: .subtitles,
+            configuration: wordConfiguration
+        ))
+        let wordCommand = YTDLPService.preparedDownloadArguments(
+            wordBaseCommand,
+            temporaryDirectory: URL(fileURLWithPath: "/tmp/MediaHarborSelfCheck/word"),
+            ffmpegURL: nil,
+            stageSubtitles: true
+        )
+        if !wordCommand.contains("srt")
+            || wordCommand.contains("rtf")
+            || !wordCommand.contains("subtitle:/tmp/MediaHarborSelfCheck/word") {
+            failures.append("Word subtitle staging")
+        }
+
+        let srt = """
+        1
+        00:00:01,000 --> 00:00:03,000
+        <i>こんにちは</i>
+
+        2
+        00:00:04,000 --> 00:00:06,000
+        字幕 &amp; transcript
+        """
+        let transcript = SubtitleDocumentExporter.transcriptParagraphs(fromSRT: srt)
+        let rtf = SubtitleDocumentExporter.rtfDocument(title: "Example", paragraphs: transcript)
+        if transcript != ["こんにちは", "字幕 & transcript"]
+            || !rtf.hasPrefix("{\\rtf1")
+            || !rtf.contains("\\u") {
+            failures.append("Word subtitle conversion")
+        }
+        let documentCheckDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaHarborDocumentSelfCheck-\(UUID().uuidString)", isDirectory: true)
+        do {
+            let stagingDirectory = documentCheckDirectory.appendingPathComponent("staging", isDirectory: true)
+            let outputDirectory = documentCheckDirectory.appendingPathComponent("output", isDirectory: true)
+            try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
+            try srt.write(
+                to: stagingDirectory.appendingPathComponent("Example.ja.srt"),
+                atomically: true,
+                encoding: .utf8
+            )
+            let exports = try SubtitleDocumentExporter.exportRTFDocuments(
+                from: stagingDirectory,
+                to: outputDirectory
+            )
+            if exports.count != 1
+                || exports.first?.pathExtension != "rtf"
+                || !FileManager.default.fileExists(atPath: exports[0].path) {
+                failures.append("Word subtitle file export")
+            }
+        } catch {
+            failures.append("Word subtitle file export: \(error.localizedDescription)")
+        }
+        try? FileManager.default.removeItem(at: documentCheckDirectory)
+
         let json = #"{"id":"abc","title":"Example","width":1080,"height":1920,"formats":[{"format_id":"1","height":720},{"format_id":"2","height":1080},{"format_id":"3","height":1080}],"subtitles":{"en":[{"ext":"vtt"}]},"automatic_captions":{"zh-Hans":[{"ext":"json3"}],"live_chat":[{"ext":"json"}]}}"#
         do {
             let info = try JSONDecoder().decode(MediaInfo.self, from: Data(json.utf8))

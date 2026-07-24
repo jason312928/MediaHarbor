@@ -97,6 +97,7 @@ case "$MODE" in
       rmdir "$PACKAGE_MOUNT" >/dev/null 2>&1 || true
     }
     trap cleanup_package EXIT
+    xattr -cr "$APP_BUNDLE"
     codesign --force --deep --sign - "$APP_BUNDLE"
     codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
     rm -f "$ARCHIVE" "$DISK_IMAGE" "$READ_WRITE_IMAGE"

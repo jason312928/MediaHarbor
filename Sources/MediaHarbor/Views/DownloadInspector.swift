@@ -38,6 +38,7 @@ struct DownloadInspector: View {
                         Text("SRT").tag("srt")
                         Text("WebVTT").tag("vtt")
                         Text("ASS").tag("ass")
+                        Text(L10n.text("word_rtf", language)).tag("rtf")
                         Text(L10n.text("original_best", language)).tag("best")
                     }
                     Toggle(L10n.text("automatic_subtitles", language), isOn: $includeAutomaticSubtitles)
