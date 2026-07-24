@@ -69,7 +69,12 @@ enum WindowSizing {
         let requiredWidth = requiredContentWidth(sidebar: sidebar, inspector: inspector)
         let currentContentWidth = window.contentLayoutRect.width
         guard currentContentWidth + 1 < requiredWidth else {
-            completion()
+            performCompletion(
+                completion,
+                in: window,
+                anchor: anchor,
+                targetFrameWidth: window.frame.width
+            )
             constrainAfterLayout(
                 window,
                 anchor: anchor,
@@ -94,7 +99,12 @@ enum WindowSizing {
         }
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             window.setFrame(frame, display: true, animate: false)
-            completion()
+            performCompletion(
+                completion,
+                in: window,
+                anchor: anchor,
+                targetFrameWidth: frame.width
+            )
             constrainAfterLayout(
                 window,
                 anchor: anchor,
@@ -110,7 +120,12 @@ enum WindowSizing {
             window.animator().setFrame(frame, display: true)
         } completionHandler: {
             DispatchQueue.main.async {
-                completion()
+                performCompletion(
+                    completion,
+                    in: window,
+                    anchor: anchor,
+                    targetFrameWidth: frame.width
+                )
                 constrainAfterLayout(
                     window,
                     anchor: anchor,
@@ -118,6 +133,30 @@ enum WindowSizing {
                     targetFrameWidth: frame.width
                 )
             }
+        }
+    }
+
+    @MainActor
+    private static func performCompletion(
+        _ completion: @escaping () -> Void,
+        in window: NSWindow,
+        anchor: ExpansionAnchor,
+        targetFrameWidth: CGFloat
+    ) {
+        guard anchor == .trailingEdge else {
+            completion()
+            return
+        }
+
+        let previousMaxSize = window.maxSize
+        var lockedMaxSize = previousMaxSize
+        lockedMaxSize.width = min(previousMaxSize.width, targetFrameWidth)
+        window.maxSize = lockedMaxSize
+        completion()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + expansionDuration + 0.08) { [weak window] in
+            guard let window, abs(window.maxSize.width - lockedMaxSize.width) < 0.5 else { return }
+            window.maxSize = previousMaxSize
         }
     }
 
@@ -166,12 +205,6 @@ enum WindowSizing {
         guard let window else { return }
         constrainToVisibleScreen(window, anchor: anchor, fixedEdge: fixedEdge, targetFrameWidth: targetFrameWidth)
         DispatchQueue.main.async { [weak window] in
-            constrainToVisibleScreen(window, anchor: anchor, fixedEdge: fixedEdge, targetFrameWidth: targetFrameWidth)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak window] in
-            constrainToVisibleScreen(window, anchor: anchor, fixedEdge: fixedEdge, targetFrameWidth: targetFrameWidth)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak window] in
             constrainToVisibleScreen(window, anchor: anchor, fixedEdge: fixedEdge, targetFrameWidth: targetFrameWidth)
         }
     }

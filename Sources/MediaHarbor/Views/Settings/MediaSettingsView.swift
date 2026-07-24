@@ -22,6 +22,7 @@ struct MediaSettingsView: View {
                     Text("SRT").tag("srt")
                     Text("WebVTT").tag("vtt")
                     Text("ASS").tag("ass")
+                    Text(L10n.text("word_rtf", language)).tag("rtf")
                     Text(L10n.text("original_best", language)).tag("best")
                 }
                 .disabled(!subtitlesEnabled)

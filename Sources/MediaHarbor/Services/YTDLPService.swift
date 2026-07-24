@@ -40,6 +40,17 @@ actor YTDLPService {
         return candidates.compactMap { $0 }.first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 
+    nonisolated static func ffmpegExecutableURL(fileManager: FileManager = .default) -> URL? {
+        let candidates: [URL?] = [
+            Bundle.main.url(forResource: "ffmpeg", withExtension: nil, subdirectory: "Tools"),
+            managedExecutableURL.deletingLastPathComponent().appendingPathComponent("ffmpeg"),
+            URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg"),
+            URL(fileURLWithPath: "/usr/local/bin/ffmpeg"),
+            URL(fileURLWithPath: "/opt/local/bin/ffmpeg")
+        ]
+        return candidates.compactMap { $0 }.first { fileManager.isExecutableFile(atPath: $0.path) }
+    }
+
     func version() async -> String? {
         guard let executable = executableURL() else { return nil }
         return try? await run(executable: executable, arguments: ["--version"]).stdout
@@ -96,14 +107,60 @@ actor YTDLPService {
             withIntermediateDirectories: true
         )
 
-        let arguments = commandBuilder.arguments(for: DownloadRequest(url: url, quality: quality, configuration: configuration))
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaHarbor", isDirectory: true)
+            .appendingPathComponent(jobID.uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+        let baseArguments = commandBuilder.arguments(
+            for: DownloadRequest(url: url, quality: quality, configuration: configuration)
+        )
+        let shouldExportSubtitleDocument = configuration.subtitleFormat == "rtf"
+            && (quality == .subtitles || configuration.downloadSubtitles || configuration.embedSubtitles)
+        let arguments = Self.preparedDownloadArguments(
+            baseArguments,
+            temporaryDirectory: temporaryDirectory,
+            ffmpegURL: Self.ffmpegExecutableURL(),
+            stageSubtitles: shouldExportSubtitleDocument
+        )
 
         let result = try await run(executable: executable, arguments: arguments, processID: jobID) { line in
             if let progress = Self.parseProgress(line) { onProgress(progress) }
         }
+        let exportedDocuments: [URL]
+        if shouldExportSubtitleDocument {
+            exportedDocuments = try SubtitleDocumentExporter.exportRTFDocuments(
+                from: temporaryDirectory,
+                to: URL(fileURLWithPath: configuration.outputDirectory, isDirectory: true)
+            )
+        } else {
+            exportedDocuments = []
+        }
         let paths = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
-        if quality == .subtitles { return configuration.outputDirectory }
+        if quality == .subtitles {
+            return exportedDocuments.first?.path ?? configuration.outputDirectory
+        }
         return paths.last(where: { $0.hasPrefix("/") }) ?? configuration.outputDirectory
+    }
+
+    nonisolated static func preparedDownloadArguments(
+        _ baseArguments: [String],
+        temporaryDirectory: URL,
+        ffmpegURL: URL?,
+        stageSubtitles: Bool = false
+    ) -> [String] {
+        guard let sourceURL = baseArguments.last else { return baseArguments }
+        var arguments = Array(baseArguments.dropLast())
+        arguments += ["--paths", "temp:\(temporaryDirectory.path)"]
+        if stageSubtitles {
+            arguments += ["--paths", "subtitle:\(temporaryDirectory.path)"]
+        }
+        if let ffmpegURL {
+            arguments += ["--ffmpeg-location", ffmpegURL.path]
+        }
+        arguments.append(sourceURL)
+        return arguments
     }
 
     func cancel(jobID: UUID) {

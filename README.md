@@ -16,7 +16,8 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 - 自动安装和更新官方 `yt-dlp_macos`
 - 支持链接拖放、剪贴板分析、键盘快捷键、菜单栏进度和 Finder 定位
 - 缩略图会保持横向或竖向媒体的原始比例，并兼容需要来源页请求头的站点
-- 支持视频清晰度、纯音频和仅字幕下载；可识别人工/自动字幕、筛选语言、输出 SRT/VTT/ASS，并选择保留独立字幕文件或嵌入视频
+- 支持视频清晰度、纯音频和仅字幕下载；可识别人工/自动字幕、筛选语言、输出 SRT/VTT/ASS 或 Word RTF 文档，并选择保留独立字幕文件或嵌入视频
+- 自动定位常见安装位置的 FFmpeg，并在任务结束后清理临时处理文件
 - 支持播放列表、媒体信息、浏览器 Cookie 和 SponsorBlock；登录或受限内容可直接读取常用浏览器 Cookie
 - 下载队列提供实时进度、速度、ETA、取消、通知和本地历史记录
 - 无账户、无广告、无分析追踪
@@ -45,7 +46,7 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.2.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.3.0 ./script/build_and_run.sh --package
 ```
 
 打包模式会在 `dist/` 中生成当前架构的版本化 DMG 和 ZIP。

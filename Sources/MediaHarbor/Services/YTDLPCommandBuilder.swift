@@ -84,11 +84,11 @@ private struct SubtitleArguments: DownloadArgumentContributor {
 
         let format = request.configuration.subtitleFormat
         if format != "best" {
-            result += ["--sub-format", "best", "--convert-subs", format]
+            result += ["--sub-format", "best", "--convert-subs", format == "rtf" ? "srt" : format]
         }
         if request.configuration.embedSubtitles && !subtitleOnly {
             result.append("--embed-subs")
-            if !request.configuration.downloadSubtitles {
+            if !request.configuration.downloadSubtitles && format != "rtf" {
                 result += ["--compat-options", "no-keep-subs"]
             }
         }
