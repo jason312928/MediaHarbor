@@ -20,11 +20,16 @@ final class DownloadStore {
     var showInspector = true
 
     private let service = YTDLPService()
+    private let historyStore: DownloadHistoryStore
+    private var canSaveHistory: Bool
     private var analysisTask: Task<Void, Never>?
     private var downloadTasks: [UUID: Task<Void, Never>] = [:]
 
-    init() {
-        history = Self.loadHistory()
+    init(historyStore: DownloadHistoryStore = DownloadHistoryStore()) {
+        self.historyStore = historyStore
+        let loadedHistory = historyStore.load()
+        history = loadedHistory.jobs
+        canSaveHistory = loadedHistory.canSave
         Task { await refreshToolStatus() }
     }
 
@@ -163,7 +168,9 @@ final class DownloadStore {
                 if let completed = jobs.first(where: { $0.id == jobID }) {
                     history.removeAll { $0.id == completed.id }
                     history.insert(completed, at: 0)
-                    Self.saveHistory(history)
+                    if canSaveHistory {
+                        try? historyStore.save(history)
+                    }
                     notifyCompletion(completed)
                 }
             } catch {
@@ -197,23 +204,4 @@ final class DownloadStore {
         return "\(message)\n\n\(platform.name) may require a signed-in browser session. Choose a browser in Settings › Engine and try again."
     }
 
-    private static var historyURL: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return support.appendingPathComponent("MediaHarbor/history.json")
-    }
-
-    private static func loadHistory() -> [DownloadJob] {
-        guard let data = try? Data(contentsOf: historyURL) else { return [] }
-        return (try? JSONDecoder().decode([DownloadJob].self, from: data)) ?? []
-    }
-
-    private static func saveHistory(_ history: [DownloadJob]) {
-        do {
-            try FileManager.default.createDirectory(at: historyURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(Array(history.prefix(200)))
-            try data.write(to: historyURL, options: .atomic)
-        } catch {
-            // History persistence should never interrupt a completed download.
-        }
-    }
 }
