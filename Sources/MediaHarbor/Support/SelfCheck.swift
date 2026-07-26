@@ -46,6 +46,68 @@ enum SelfCheck {
         }
         try? FileManager.default.removeItem(at: updaterCheckDirectory)
 
+        let historyCheckDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaHarborHistorySelfCheck-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: historyCheckDirectory, withIntermediateDirectories: true)
+            let first = SelfCheck.downloadJob(title: "First")
+            let second = SelfCheck.downloadJob(title: "Second")
+            let encoder = JSONEncoder()
+            let mixedURL = historyCheckDirectory.appendingPathComponent("history.json")
+            let mixedData = try JSONSerialization.data(withJSONObject: [
+                try JSONSerialization.jsonObject(with: encoder.encode(first)),
+                ["id": "incomplete-record"],
+                try JSONSerialization.jsonObject(with: encoder.encode(second))
+            ])
+            try mixedData.write(to: mixedURL)
+
+            let mixedStore = DownloadHistoryStore(url: mixedURL)
+            let mixedResult = mixedStore.load()
+            let repairedJobs = try JSONDecoder().decode([DownloadJob].self, from: Data(contentsOf: mixedURL))
+            let mixedBackups = try FileManager.default.contentsOfDirectory(
+                at: historyCheckDirectory,
+                includingPropertiesForKeys: nil
+            ).filter { $0.lastPathComponent.hasPrefix("history.corrupt-") }
+            if mixedResult.jobs.map(\.id) != [first.id, second.id]
+                || !mixedResult.canSave
+                || repairedJobs.map(\.id) != [first.id, second.id]
+                || mixedBackups.count != 1 {
+                failures.append("lossy download history recovery")
+            }
+
+            let truncatedURL = historyCheckDirectory.appendingPathComponent("truncated.json")
+            let truncatedData = Data(#"[{"id":"unfinished""#.utf8)
+            try truncatedData.write(to: truncatedURL)
+            let truncatedResult = DownloadHistoryStore(url: truncatedURL).load()
+            let truncatedBackups = try FileManager.default.contentsOfDirectory(
+                at: historyCheckDirectory,
+                includingPropertiesForKeys: nil
+            ).filter { $0.lastPathComponent.hasPrefix("truncated.corrupt-") }
+            let truncatedBackupData = try truncatedBackups.first.map { try Data(contentsOf: $0) }
+            let repairedTruncatedJobs = try JSONDecoder().decode(
+                [DownloadJob].self,
+                from: Data(contentsOf: truncatedURL)
+            )
+            if !truncatedResult.jobs.isEmpty
+                || !truncatedResult.canSave
+                || truncatedBackups.count != 1
+                || truncatedBackupData != truncatedData
+                || !repairedTruncatedJobs.isEmpty {
+                failures.append("corrupt download history backup")
+            }
+
+            let cappedURL = historyCheckDirectory.appendingPathComponent("capped.json")
+            let cappedStore = DownloadHistoryStore(url: cappedURL)
+            let oversizedHistory = (0..<205).map { SelfCheck.downloadJob(title: "Item \($0)") }
+            try cappedStore.save(oversizedHistory)
+            if cappedStore.load().jobs.count != 200 {
+                failures.append("download history limit")
+            }
+        } catch {
+            failures.append("download history persistence: \(error.localizedDescription)")
+        }
+        try? FileManager.default.removeItem(at: historyCheckDirectory)
+
         let selector = QualityChoice.video(height: 1080).formatSelector
         if selector != "bestvideo[height<=1080]+bestaudio/best[height<=1080]" {
             failures.append("quality selector")
@@ -261,6 +323,24 @@ enum SelfCheck {
         }
 
         return failures
+    }
+
+    private static func downloadJob(title: String) -> DownloadJob {
+        DownloadJob(
+            id: UUID(),
+            sourceURL: "https://example.com/media",
+            title: title,
+            thumbnail: nil,
+            sourceName: "Example",
+            qualityTitle: "1080p",
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            status: .completed,
+            progress: 1,
+            speed: nil,
+            eta: nil,
+            detail: "Saved",
+            outputPath: "/tmp/example.mp4"
+        )
     }
 }
 
