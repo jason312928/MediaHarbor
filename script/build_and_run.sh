@@ -17,8 +17,10 @@ DIST_DIR="$PROJECT_ROOT/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
+APP_ICON_SOURCE="$PROJECT_ROOT/Resources/AppIcon.icns"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -27,8 +29,9 @@ swift build -c "$BUILD_CONFIGURATION"
 BUILD_BINARY="$(swift build -c "$BUILD_CONFIGURATION" --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
+cp "$APP_ICON_SOURCE" "$APP_RESOURCES/$APP_NAME.icns"
 chmod +x "$APP_BINARY"
 
 cat >"$INFO_PLIST" <<PLIST
@@ -44,6 +47,8 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
   <string>MediaHarbor</string>
+  <key>CFBundleIconFile</key>
+  <string>$APP_NAME</string>
   <key>CFBundleShortVersionString</key>
   <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
