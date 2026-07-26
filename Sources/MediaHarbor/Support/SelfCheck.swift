@@ -1,7 +1,8 @@
 import Foundation
+import Darwin
 
 enum SelfCheck {
-    static func run() -> [String] {
+    static func run() async -> [String] {
         var failures: [String] = []
 
         let progress = YTDLPService.parseProgress("download: 42.5%|3.2MiB/s|00:12")
@@ -45,6 +46,7 @@ enum SelfCheck {
             failures.append("atomic yt-dlp update: \(error.localizedDescription)")
         }
         try? FileManager.default.removeItem(at: updaterCheckDirectory)
+        failures += await cancellableProcessFailures()
 
         let historyCheckDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("MediaHarborHistorySelfCheck-\(UUID().uuidString)", isDirectory: true)
@@ -341,6 +343,160 @@ enum SelfCheck {
             detail: "Saved",
             outputPath: "/tmp/example.mp4"
         )
+    }
+
+    private static func cancellableProcessFailures() async -> [String] {
+        var failures: [String] = []
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaHarborProcessSelfCheck-\(UUID().uuidString)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return ["process cancellation setup: \(error.localizedDescription)"]
+        }
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let service = YTDLPService(terminationGracePeriod: .milliseconds(200))
+        let shell = URL(fileURLWithPath: "/bin/sh")
+
+        do {
+            let captured = try await service.runProcessForSelfCheck(
+                executable: shell,
+                arguments: ["-c", "printf 'complete stdout'; printf 'complete stderr' >&2"],
+                runID: UUID()
+            )
+            if captured.stdout != "complete stdout" || captured.stderr != "complete stderr" {
+                failures.append("process output capture")
+            }
+        } catch {
+            failures.append("process output capture: \(error.localizedDescription)")
+        }
+
+        let preCancelledID = UUID()
+        let preCancelledMarker = directory.appendingPathComponent("pre-cancelled")
+        let preCancelledTask = Task<Void, Error> {
+            do { try await Task.sleep(for: .seconds(10)) } catch {}
+            _ = try await service.runProcessForSelfCheck(
+                executable: shell,
+                arguments: [
+                    "-c",
+                    "/usr/bin/touch \"$1\"; exec /bin/sleep 3",
+                    "self-check",
+                    preCancelledMarker.path
+                ],
+                runID: preCancelledID
+            )
+        }
+        preCancelledTask.cancel()
+        let preCancelled = await taskWasCancelled(preCancelledTask)
+        try? await Task.sleep(for: .milliseconds(50))
+        let preCancelledActive = await service.hasActiveProcessForSelfCheck(runID: preCancelledID)
+        if !preCancelled
+            || FileManager.default.fileExists(atPath: preCancelledMarker.path)
+            || preCancelledActive {
+            failures.append("pre-cancelled process launch")
+        }
+
+        let runningID = UUID()
+        let runningMarker = directory.appendingPathComponent("running")
+        let runningTask = Task<Void, Error> {
+            _ = try await service.runProcessForSelfCheck(
+                executable: shell,
+                arguments: [
+                    "-c",
+                    "/usr/bin/touch \"$1\"; exec /bin/sleep 3",
+                    "self-check",
+                    runningMarker.path
+                ],
+                runID: runningID
+            )
+        }
+        let runningStarted = await waitForFile(runningMarker)
+        let runningCancelStart = ContinuousClock.now
+        runningTask.cancel()
+        let runningCancelled = await taskWasCancelled(runningTask)
+        let runningCancelDuration = runningCancelStart.duration(to: .now)
+        let runningActive = await service.hasActiveProcessForSelfCheck(runID: runningID)
+        if !runningStarted || !runningCancelled || runningCancelDuration > .seconds(1) || runningActive {
+            failures.append("running process cancellation")
+        }
+
+        let ignoringID = UUID()
+        let ignoringMarker = directory.appendingPathComponent("ignoring-sigterm")
+        let ignoringTask = Task<Void, Error> {
+            _ = try await service.runProcessForSelfCheck(
+                executable: shell,
+                arguments: [
+                    "-c",
+                    "/bin/sh -c 'trap \"\" TERM; printf \"%s\" \"$$\" > \"$1\"; exec /bin/sleep 3' descendant \"$1\" & wait",
+                    "self-check",
+                    ignoringMarker.path
+                ],
+                runID: ignoringID
+            )
+        }
+        let ignoringDescendantPID = await waitForPID(in: ignoringMarker)
+        let ignoringCancelStart = ContinuousClock.now
+        ignoringTask.cancel()
+        let ignoringCancelled = await taskWasCancelled(ignoringTask)
+        let ignoringCancelDuration = ignoringCancelStart.duration(to: .now)
+        let ignoringActive = await service.hasActiveProcessForSelfCheck(runID: ignoringID)
+        let ignoringDescendantExited: Bool
+        if let ignoringDescendantPID {
+            ignoringDescendantExited = await waitForProcessExit(ignoringDescendantPID)
+        } else {
+            ignoringDescendantExited = false
+        }
+        if ignoringDescendantPID == nil
+            || !ignoringCancelled
+            || ignoringCancelDuration > .seconds(1)
+            || ignoringActive
+            || !ignoringDescendantExited {
+            failures.append("process cancellation escalation")
+        }
+        if let ignoringDescendantPID, !ignoringDescendantExited {
+            _ = kill(ignoringDescendantPID, SIGKILL)
+        }
+
+        return failures
+    }
+
+    private static func taskWasCancelled(_ task: Task<Void, Error>) async -> Bool {
+        do {
+            try await task.value
+            return false
+        } catch is CancellationError {
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private static func waitForFile(_ url: URL) async -> Bool {
+        for _ in 0..<200 {
+            if FileManager.default.fileExists(atPath: url.path) { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }
+
+    private static func waitForPID(in url: URL) async -> Int32? {
+        for _ in 0..<200 {
+            if let text = try? String(contentsOf: url, encoding: .utf8),
+               let processIdentifier = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                return processIdentifier
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return nil
+    }
+
+    private static func waitForProcessExit(_ processIdentifier: Int32) async -> Bool {
+        for _ in 0..<100 {
+            if kill(processIdentifier, 0) != 0, errno == ESRCH { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
     }
 }
 

@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import SwiftUI
 import UserNotifications
 
@@ -39,13 +40,17 @@ struct MediaHarborApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--self-test") {
-            let failures = SelfCheck.run()
-            if failures.isEmpty {
-                print("All MediaHarbor self-checks passed.")
-                exit(EXIT_SUCCESS)
+            Task.detached(priority: .userInitiated) {
+                let failures = await SelfCheck.run()
+                if failures.isEmpty {
+                    print("All MediaHarbor self-checks passed.")
+                    exit(EXIT_SUCCESS)
+                }
+                fputs("Self-check failures: \(failures.joined(separator: ", "))\n", stderr)
+                exit(EXIT_FAILURE)
             }
-            fputs("Self-check failures: \(failures.joined(separator: ", "))\n", stderr)
-            exit(EXIT_FAILURE)
+            DispatchSemaphore(value: 0).wait()
+            return
         }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
