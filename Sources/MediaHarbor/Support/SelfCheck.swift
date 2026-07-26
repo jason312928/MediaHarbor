@@ -68,6 +68,12 @@ enum SelfCheck {
         if !command.contains("--extract-audio") || !command.contains("--self-check-feature") || command.last != "https://example.com/media" {
             failures.append("composable command builder")
         }
+        let progressTemplate = command.firstIndex(of: "--progress-template").flatMap { index in
+            command.indices.contains(index + 1) ? command[index + 1] : nil
+        }
+        if progressTemplate != "download:download:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s" {
+            failures.append("yt-dlp progress template")
+        }
 
         let preparedCommand = YTDLPService.preparedDownloadArguments(
             command,

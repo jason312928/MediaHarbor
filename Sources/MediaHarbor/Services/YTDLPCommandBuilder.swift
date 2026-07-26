@@ -41,7 +41,7 @@ private struct CoreDownloadArguments: DownloadArgumentContributor {
         [
             "--newline",
             "--progress",
-            "--progress-template", "download:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
+            "--progress-template", "download:download:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
             "--print", "after_move:filepath",
             "--paths", request.configuration.outputDirectory,
             "--output", "%(title).180B [%(id)s].%(ext)s"
