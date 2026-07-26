@@ -16,11 +16,23 @@ enum YTDLPError: LocalizedError {
 }
 
 actor YTDLPService {
-    private var processes: [UUID: Process] = [:]
-    private let commandBuilder: YTDLPCommandBuilder
+    private struct TerminationTarget {
+        let process: Process
+        let processIdentifier: Int32
+        let processGroupIdentifier: Int32?
+    }
 
-    init(commandBuilder: YTDLPCommandBuilder = YTDLPCommandBuilder()) {
+    private var processes: [UUID: Process] = [:]
+    private var terminationTargets: [UUID: TerminationTarget] = [:]
+    private let commandBuilder: YTDLPCommandBuilder
+    private let terminationGracePeriod: Duration
+
+    init(
+        commandBuilder: YTDLPCommandBuilder = YTDLPCommandBuilder(),
+        terminationGracePeriod: Duration = .seconds(2)
+    ) {
         self.commandBuilder = commandBuilder
+        self.terminationGracePeriod = terminationGracePeriod
     }
 
     static let releaseURL = URL(string: "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos")!
@@ -205,8 +217,7 @@ actor YTDLPService {
     }
 
     func cancel(jobID: UUID) {
-        processes[jobID]?.terminate()
-        processes[jobID] = nil
+        requestTermination(runID: jobID)
     }
 
     nonisolated static func parseProgress(_ line: String) -> DownloadProgress? {
@@ -220,12 +231,29 @@ actor YTDLPService {
         return DownloadProgress(fraction: min(max(percent / 100, 0), 1), speed: speed, eta: eta, detail: line)
     }
 
+    func runProcessForSelfCheck(
+        executable: URL,
+        arguments: [String],
+        runID: UUID
+    ) async throws -> (stdout: String, stderr: String) {
+        try await run(executable: executable, arguments: arguments, processID: runID)
+    }
+
+    func hasActiveProcessForSelfCheck(runID: UUID) -> Bool {
+        processes[runID] != nil
+    }
+
     private func run(
         executable: URL,
         arguments: [String],
         processID: UUID? = nil,
         onLine: (@Sendable (String) -> Void)? = nil
     ) async throws -> (stdout: String, stderr: String) {
+        let runID = processID ?? UUID()
+        guard processes[runID] == nil, terminationTargets[runID] == nil else {
+            throw YTDLPError.commandFailed("A yt-dlp process is already running for this task.")
+        }
+
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
@@ -234,7 +262,7 @@ actor YTDLPService {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        if let processID { processes[processID] = process }
+        processes[runID] = process
         let output = OutputCollector(onLine: onLine)
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             output.append(handle.availableData, isError: false)
@@ -242,22 +270,50 @@ actor YTDLPService {
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             output.append(handle.availableData, isError: true)
         }
-
-        do { try process.run() } catch {
-            if let processID { processes[processID] = nil }
-            throw YTDLPError.commandFailed(error.localizedDescription)
+        defer {
+            stdoutPipe.fileHandleForReading.readabilityHandler = nil
+            stderrPipe.fileHandleForReading.readabilityHandler = nil
+            process.terminationHandler = nil
+            if processes[runID] === process {
+                processes[runID] = nil
+            }
         }
 
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            process.terminationHandler = { _ in continuation.resume() }
+        var operationError: Error?
+        do {
+            try await withTaskCancellationHandler {
+                try Task.checkCancellation()
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    process.terminationHandler = { _ in continuation.resume() }
+                    do {
+                        try process.run()
+                    } catch {
+                        process.terminationHandler = nil
+                        continuation.resume(throwing: YTDLPError.commandFailed(error.localizedDescription))
+                    }
+                }
+                try Task.checkCancellation()
+            } onCancel: {
+                Task { await self.requestTermination(runID: runID) }
+            }
+        } catch {
+            operationError = error
         }
+
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         stderrPipe.fileHandleForReading.readabilityHandler = nil
-        output.append(stdoutPipe.fileHandleForReading.readDataToEndOfFile(), isError: false)
-        output.append(stderrPipe.fileHandleForReading.readDataToEndOfFile(), isError: true)
-        if let processID { processes[processID] = nil }
+        output.append(drainAvailableData(from: stdoutPipe.fileHandleForReading), isError: false)
+        output.append(drainAvailableData(from: stderrPipe.fileHandleForReading), isError: true)
+        try? stdoutPipe.fileHandleForReading.close()
+        try? stderrPipe.fileHandleForReading.close()
 
         let captured = output.values
+        if Task.isCancelled {
+            throw CancellationError()
+        }
+        if let operationError {
+            throw operationError
+        }
         guard process.terminationStatus == 0 else {
             let message = captured.stderr.split(whereSeparator: \.isNewline).last.map(String.init)
                 ?? "yt-dlp exited with status \(process.terminationStatus)."
@@ -265,6 +321,74 @@ actor YTDLPService {
         }
         return captured
     }
+
+    private func requestTermination(runID: UUID) {
+        guard terminationTargets[runID] == nil,
+              let process = processes[runID],
+              process.isRunning else { return }
+
+        let processIdentifier = process.processIdentifier
+        // Foundation normally launches the child as a process-group leader. Signal the
+        // verified group so helpers such as FFmpeg receive the same cancellation.
+        let processGroupIdentifier = getpgid(processIdentifier) == processIdentifier ? processIdentifier : nil
+        terminationTargets[runID] = TerminationTarget(
+            process: process,
+            processIdentifier: processIdentifier,
+            processGroupIdentifier: processGroupIdentifier
+        )
+
+        if let processGroupIdentifier {
+            if kill(-processGroupIdentifier, SIGTERM) != 0 {
+                process.terminate()
+            }
+        } else {
+            process.terminate()
+        }
+        let gracePeriod = terminationGracePeriod
+        Task {
+            try? await Task.sleep(for: gracePeriod)
+            forceKillIfNeeded(runID: runID, expectedPID: processIdentifier)
+        }
+    }
+
+    private func forceKillIfNeeded(runID: UUID, expectedPID: Int32) {
+        guard let target = terminationTargets[runID],
+              target.processIdentifier == expectedPID else { return }
+        defer { terminationTargets[runID] = nil }
+
+        if let processGroupIdentifier = target.processGroupIdentifier {
+            _ = kill(-processGroupIdentifier, SIGKILL)
+        } else if target.process.isRunning,
+                  target.process.processIdentifier == expectedPID {
+            _ = kill(expectedPID, SIGKILL)
+        }
+    }
+}
+
+private func drainAvailableData(from handle: FileHandle) -> Data {
+    // A helper process can inherit the pipe after yt-dlp exits. Never block this actor
+    // waiting for EOF, because it also owns the delayed process-group escalation.
+    let descriptor = handle.fileDescriptor
+    let flags = fcntl(descriptor, F_GETFL)
+    guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == 0 else {
+        return Data()
+    }
+
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+    while true {
+        let count = buffer.withUnsafeMutableBytes { bytes in
+            Darwin.read(descriptor, bytes.baseAddress, bytes.count)
+        }
+        if count > 0 {
+            data.append(contentsOf: buffer.prefix(Int(count)))
+        } else if count < 0, errno == EINTR {
+            continue
+        } else {
+            break
+        }
+    }
+    return data
 }
 
 private final class OutputCollector: @unchecked Sendable {

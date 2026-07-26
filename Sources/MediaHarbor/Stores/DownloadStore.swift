@@ -150,6 +150,7 @@ final class DownloadStore {
                 ) { [weak self] progress in
                     Task { @MainActor [weak self] in
                         self?.update(jobID) {
+                            guard $0.status == .preparing || $0.status == .downloading else { return }
                             $0.status = .downloading
                             $0.progress = progress.fraction
                             $0.speed = progress.speed
