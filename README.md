@@ -25,6 +25,7 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 ## 系统要求
 
 - macOS 14 Sonoma 或更高版本
+- GitHub Release 的预编译安装包目前仅支持 Apple Silicon（arm64）；Intel Mac 可使用 Swift 6 从源码构建
 - 源码构建需要 Swift 6 工具链
 - 合并和后期处理需要 FFmpeg；Homebrew 用户可运行 `brew install ffmpeg`
 
