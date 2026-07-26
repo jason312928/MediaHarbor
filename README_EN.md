@@ -25,6 +25,7 @@ MediaHarbor is a modern, native media downloader for macOS powered by [yt-dlp](h
 ## Requirements
 
 - macOS 14 Sonoma or later
+- Prebuilt GitHub Release packages currently support Apple Silicon (arm64) only; Intel Mac users can build from source with Swift 6
 - Swift 6 toolchain for source builds
 - FFmpeg for merging and post-processing; Homebrew users can run `brew install ffmpeg`
 

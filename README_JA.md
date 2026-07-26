@@ -25,6 +25,7 @@ MediaHarbor は、[yt-dlp](https://github.com/yt-dlp/yt-dlp) を基盤に開発�
 ## 動作要件
 
 - macOS 14 Sonoma以降
+- GitHub Releaseのビルド済みパッケージは現在Apple Silicon（arm64）のみ対応。Intel MacではSwift 6を使用してソースからビルド可能
 - ソースからのビルドにはSwift 6ツールチェーン
 - 結合と後処理にはFFmpeg。Homebrewでは`brew install ffmpeg`を実行
 
