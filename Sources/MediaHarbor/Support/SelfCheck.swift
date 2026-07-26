@@ -10,6 +10,42 @@ enum SelfCheck {
             failures.append("progress parser")
         }
 
+        let updaterCheckDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaHarborUpdaterSelfCheck-\(UUID().uuidString)", isDirectory: true)
+        do {
+            let destination = updaterCheckDirectory.appendingPathComponent("yt-dlp")
+            let candidate = updaterCheckDirectory.appendingPathComponent("candidate")
+            try FileManager.default.createDirectory(at: updaterCheckDirectory, withIntermediateDirectories: true)
+            try "old-version".write(to: destination, atomically: true, encoding: .utf8)
+            try "new-version".write(to: candidate, atomically: true, encoding: .utf8)
+            let stagingURL = try YTDLPService.stageDownloadedExecutable(from: candidate, nextTo: destination)
+            try YTDLPService.activateDownloadedExecutable(from: stagingURL, to: destination)
+
+            let installed = try String(contentsOf: destination, encoding: .utf8)
+            if installed != "new-version"
+                || !FileManager.default.fileExists(atPath: candidate.path)
+                || FileManager.default.fileExists(atPath: stagingURL.path)
+                || !FileManager.default.isExecutableFile(atPath: destination.path) {
+                failures.append("atomic yt-dlp update")
+            }
+
+            let preservedDestination = updaterCheckDirectory.appendingPathComponent("preserved-yt-dlp")
+            let missingStagingURL = updaterCheckDirectory.appendingPathComponent("missing-candidate")
+            try "preserved-version".write(to: preservedDestination, atomically: true, encoding: .utf8)
+            do {
+                try YTDLPService.activateDownloadedExecutable(from: missingStagingURL, to: preservedDestination)
+                failures.append("failed yt-dlp update")
+            } catch {
+                let preserved = try String(contentsOf: preservedDestination, encoding: .utf8)
+                if preserved != "preserved-version" {
+                    failures.append("failed yt-dlp update preserves installed tool")
+                }
+            }
+        } catch {
+            failures.append("atomic yt-dlp update: \(error.localizedDescription)")
+        }
+        try? FileManager.default.removeItem(at: updaterCheckDirectory)
+
         let selector = QualityChoice.video(height: 1080).formatSelector
         if selector != "bestvideo[height<=1080]+bestaudio/best[height<=1080]" {
             failures.append("quality selector")

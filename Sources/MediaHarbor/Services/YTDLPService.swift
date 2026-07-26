@@ -53,26 +53,67 @@ actor YTDLPService {
 
     func version() async -> String? {
         guard let executable = executableURL() else { return nil }
-        return try? await run(executable: executable, arguments: ["--version"]).stdout
+        return try? await run(executable: executable, arguments: ["--ignore-config", "--version"]).stdout
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func installOrUpdate() async throws -> String {
         let (temporaryURL, response) = try await URLSession.shared.download(from: Self.releaseURL)
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
         guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
             throw YTDLPError.commandFailed("Could not download yt-dlp from its official GitHub release.")
         }
 
-        let destination = Self.managedExecutableURL
-        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
+        let stagingURL = try Self.stageDownloadedExecutable(
+            from: temporaryURL,
+            nextTo: Self.managedExecutableURL
+        )
+        defer { try? FileManager.default.removeItem(at: stagingURL) }
+
+        let candidateVersion: String
+        do {
+            candidateVersion = try await run(
+                executable: stagingURL,
+                arguments: ["--ignore-config", "--version"]
+            ).stdout
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            throw YTDLPError.commandFailed("The downloaded yt-dlp executable could not be verified: \(error.localizedDescription)")
         }
-        try FileManager.default.moveItem(at: temporaryURL, to: destination)
-        guard chmod(destination.path, 0o755) == 0 else {
-            throw YTDLPError.commandFailed("yt-dlp downloaded, but MediaHarbor could not make it executable.")
+        guard !candidateVersion.isEmpty else {
+            throw YTDLPError.commandFailed("The downloaded yt-dlp executable did not report a version.")
         }
-        return await version() ?? "Installed"
+
+        try Self.activateDownloadedExecutable(from: stagingURL, to: Self.managedExecutableURL)
+        return candidateVersion
+    }
+
+    nonisolated static func stageDownloadedExecutable(
+        from downloadedURL: URL,
+        nextTo destination: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let parent = destination.deletingLastPathComponent()
+        try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+
+        let stagingURL = parent.appendingPathComponent(".yt-dlp-\(UUID().uuidString).download")
+        do {
+            try fileManager.copyItem(at: downloadedURL, to: stagingURL)
+            guard chmod(stagingURL.path, 0o755) == 0 else {
+                throw YTDLPError.commandFailed("yt-dlp downloaded, but MediaHarbor could not make it executable.")
+            }
+            return stagingURL
+        } catch {
+            try? fileManager.removeItem(at: stagingURL)
+            throw error
+        }
+    }
+
+    nonisolated static func activateDownloadedExecutable(from stagingURL: URL, to destination: URL) throws {
+        guard rename(stagingURL.path, destination.path) == 0 else {
+            let code = POSIXErrorCode(rawValue: errno) ?? .EIO
+            throw POSIXError(code)
+        }
     }
 
     func analyze(url: String, configuration: DownloadConfiguration) async throws -> MediaInfo {
