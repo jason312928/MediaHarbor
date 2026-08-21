@@ -16,7 +16,7 @@ MediaHarbor は、[yt-dlp](https://github.com/yt-dlp/yt-dlp) を基盤に開発�
 - 公式`yt-dlp_macos`をオンデマンドでインストール・更新
 - URLのドラッグ＆ドロップ、クリップボード解析、ショートカット、メニューバー進捗、Finder表示
 - 横長・縦長メディアの元の比率を保つサムネイル表示と、参照元ページのリクエストヘッダーが必要なサイトへの対応
-- 画質選択、音声のみ、字幕のみのダウンロードに対応。手動／自動字幕の検出、言語選択、SRT/VTT/ASSまたはWord RTF出力、字幕ファイルの保存または埋め込みが可能
+- 画質選択、音声のみ、字幕のみのダウンロードに対応。手動／自動字幕の検出、言語選択、SRT/VTT/ASSまたはMicrosoft Word DOCX出力、字幕ファイルの保存または埋め込みが可能
 - 一般的なインストール先からFFmpegを自動検出し、各ジョブの完了後に一時処理ファイルをクリーンアップ
 - プレイリスト、メタデータ、ブラウザCookie、SponsorBlockに対応。ログインや制限付きメディアには一般的なブラウザのCookieを利用可能
 - 進捗、速度、ETA、キャンセル、通知、ローカル履歴を備えたダウンロードキュー
@@ -47,7 +47,7 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.3.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.4.0 ./script/build_and_run.sh --package
 ```
 
 パッケージモードは、現在のアーキテクチャ向けのバージョン付きDMGとZIPを`dist/`に作成します。

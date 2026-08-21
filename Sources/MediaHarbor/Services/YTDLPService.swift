@@ -140,11 +140,28 @@ actor YTDLPService {
             arguments: arguments
         )
         guard let data = result.stdout.data(using: .utf8) else { throw YTDLPError.invalidResponse }
-        do {
-            return try JSONDecoder().decode(MediaInfo.self, from: data)
-        } catch {
+        return try Self.decodeMediaInfo(from: data)
+    }
+
+    nonisolated static func decodeMediaInfo(from data: Data) throws -> MediaInfo {
+        let decoder = JSONDecoder()
+        if let media = try? decoder.decode(MediaInfo.self, from: data) {
+            return media
+        }
+
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any],
+              let entries = dictionary["entries"] as? [[String: Any]] else {
             throw YTDLPError.invalidResponse
         }
+
+        for entry in entries {
+            guard let entryData = try? JSONSerialization.data(withJSONObject: entry) else { continue }
+            if let media = try? decoder.decode(MediaInfo.self, from: entryData) {
+                return media
+            }
+        }
+        throw YTDLPError.invalidResponse
     }
 
     func download(
@@ -160,16 +177,13 @@ actor YTDLPService {
             withIntermediateDirectories: true
         )
 
-        let temporaryDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("MediaHarbor", isDirectory: true)
-            .appendingPathComponent(jobID.uuidString, isDirectory: true)
+        let temporaryDirectory = Self.partialDirectory(jobID: jobID, configuration: configuration)
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
 
         let baseArguments = commandBuilder.arguments(
             for: DownloadRequest(url: url, quality: quality, configuration: configuration)
         )
-        let shouldExportSubtitleDocument = configuration.subtitleFormat == "rtf"
+        let shouldExportSubtitleDocument = ["docx", "rtf"].contains(configuration.subtitleFormat)
             && (quality == .subtitles || configuration.downloadSubtitles || configuration.embedSubtitles)
         let arguments = Self.preparedDownloadArguments(
             baseArguments,
@@ -183,18 +197,80 @@ actor YTDLPService {
         }
         let exportedDocuments: [URL]
         if shouldExportSubtitleDocument {
-            exportedDocuments = try SubtitleDocumentExporter.exportRTFDocuments(
+            exportedDocuments = try SubtitleDocumentExporter.exportDOCXDocuments(
                 from: temporaryDirectory,
                 to: URL(fileURLWithPath: configuration.outputDirectory, isDirectory: true)
             )
         } else {
             exportedDocuments = []
         }
+        try Self.validateSubtitleDocumentResult(
+            quality: quality,
+            shouldExportSubtitleDocument: shouldExportSubtitleDocument,
+            exportedDocuments: exportedDocuments
+        )
         let paths = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
         if quality == .subtitles {
-            return exportedDocuments.first?.path ?? configuration.outputDirectory
+            let result = exportedDocuments.first?.path ?? configuration.outputDirectory
+            Self.removePartialDirectory(temporaryDirectory)
+            return result
         }
-        return paths.last(where: { $0.hasPrefix("/") }) ?? configuration.outputDirectory
+        let outputPath = paths.last(where: { $0.hasPrefix("/") }) ?? configuration.outputDirectory
+        Self.removePartialDirectory(temporaryDirectory)
+        return outputPath
+    }
+
+    func removePartialDownload(jobID: UUID, configuration: DownloadConfiguration) throws {
+        let persistentDirectory = Self.partialDirectory(jobID: jobID, configuration: configuration)
+        if FileManager.default.fileExists(atPath: persistentDirectory.path) {
+            try FileManager.default.removeItem(at: persistentDirectory)
+        }
+
+        let legacyDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MediaHarbor", isDirectory: true)
+            .appendingPathComponent(jobID.uuidString, isDirectory: true)
+        if FileManager.default.fileExists(atPath: legacyDirectory.path) {
+            try FileManager.default.removeItem(at: legacyDirectory)
+        }
+    }
+
+    func waitUntilIdle(jobID: UUID) async {
+        while processes[jobID] != nil || terminationTargets[jobID] != nil {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    nonisolated static func partialDirectory(
+        jobID: UUID,
+        configuration: DownloadConfiguration
+    ) -> URL {
+        URL(fileURLWithPath: configuration.outputDirectory, isDirectory: true)
+            .appendingPathComponent(".MediaHarbor", isDirectory: true)
+            .appendingPathComponent("Partial", isDirectory: true)
+            .appendingPathComponent(jobID.uuidString, isDirectory: true)
+    }
+
+    nonisolated private static func removePartialDirectory(_ directory: URL) {
+        try? FileManager.default.removeItem(at: directory)
+        let partialRoot = directory.deletingLastPathComponent()
+        let appRoot = partialRoot.deletingLastPathComponent()
+        if (try? FileManager.default.contentsOfDirectory(atPath: partialRoot.path).isEmpty) == true {
+            try? FileManager.default.removeItem(at: partialRoot)
+        }
+        if (try? FileManager.default.contentsOfDirectory(atPath: appRoot.path).isEmpty) == true {
+            try? FileManager.default.removeItem(at: appRoot)
+        }
+    }
+
+    nonisolated static func validateSubtitleDocumentResult(
+        quality: QualityChoice,
+        shouldExportSubtitleDocument: Bool,
+        exportedDocuments: [URL]
+    ) throws {
+        guard quality == .subtitles,
+              shouldExportSubtitleDocument,
+              exportedDocuments.isEmpty else { return }
+        throw YTDLPError.commandFailed(SubtitleDocumentExporter.noSubtitlesMessage)
     }
 
     nonisolated static func preparedDownloadArguments(

@@ -109,6 +109,64 @@ enum SelfCheck {
             failures.append("download history persistence: \(error.localizedDescription)")
         }
         try? FileManager.default.removeItem(at: historyCheckDirectory)
+        let cliDefaults = UserDefaults(suiteName: "MediaHarborSelfCheck.AgentCLI")!
+        cliDefaults.removePersistentDomain(forName: "MediaHarborSelfCheck.AgentCLI")
+        cliDefaults.set("/tmp/should-not-be-used", forKey: "outputDirectory")
+        do {
+            let command = try AgentCLIParser.parse([
+                "download", "https://example.com/video", "--no-app-settings",
+                "--quality", "1080p", "--output", "~/AgentDownloads",
+                "--subtitles", "--sub-format", "docx", "--cookies", "safari"
+            ], defaults: cliDefaults)
+            if case .download(let url, let quality, let configuration) = command {
+                if url != "https://example.com/video"
+                    || quality != .video(height: 1080)
+                    || !configuration.outputDirectory.hasSuffix("/AgentDownloads")
+                    || !configuration.downloadSubtitles
+                    || configuration.subtitleFormat != "docx"
+                    || configuration.browserCookies != "safari" {
+                    failures.append("agent CLI parser")
+                }
+            } else {
+                failures.append("agent CLI parser")
+            }
+        } catch {
+            failures.append("agent CLI parser")
+        }
+        if (try? AgentCLIParser.qualityChoice("best"))?.formatSelector != "bestvideo+bestaudio/best"
+            || !AgentCLIParser.isCLIInvocation(["capabilities"]) {
+            failures.append("agent CLI capabilities")
+        }
+        cliDefaults.removePersistentDomain(forName: "MediaHarborSelfCheck.AgentCLI")
+
+        let edgeApplicationURL = URL(fileURLWithPath: "/Applications/Microsoft Edge.app")
+        let selectedBrowserRecovery = BrowserLoginResolver.recovery(
+            for: "https://www.bilibili.com/bangumi/play/ss68627",
+            configuredCookieSource: "Edge",
+            defaultApplicationURL: URL(fileURLWithPath: "/Applications/Safari.app"),
+            applicationURLForBundleIdentifier: { identifier in
+                identifier == "com.microsoft.edgemac" ? edgeApplicationURL : nil
+            }
+        )
+        if selectedBrowserRecovery?.browserName != "Microsoft Edge"
+            || selectedBrowserRecovery?.cookieSource != "Edge"
+            || selectedBrowserRecovery?.applicationURL != edgeApplicationURL {
+            failures.append("selected browser sign-in recovery")
+        }
+
+        let chromeApplicationURL = URL(fileURLWithPath: "/Applications/Google Chrome.app")
+        let automaticBrowserRecovery = BrowserLoginResolver.recovery(
+            for: "https://www.bilibili.com/video/BV1example",
+            configuredCookieSource: "None",
+            defaultApplicationURL: nil,
+            applicationURLForBundleIdentifier: { identifier in
+                identifier == "com.google.Chrome" ? chromeApplicationURL : nil
+            }
+        )
+        if automaticBrowserRecovery?.browserName != "Google Chrome"
+            || automaticBrowserRecovery?.cookieSource != "Chrome" {
+            failures.append("default browser sign-in recovery")
+        }
 
         let selector = QualityChoice.video(height: 1080).formatSelector
         if selector != "bestvideo[height<=1080]+bestaudio/best[height<=1080]" {
@@ -129,7 +187,10 @@ enum SelfCheck {
         )
         let command = YTDLPCommandBuilder(additionalContributors: [SelfCheckArgumentContributor()])
             .arguments(for: DownloadRequest(url: "https://example.com/media", quality: .audio, configuration: configuration))
-        if !command.contains("--extract-audio") || !command.contains("--self-check-feature") || command.last != "https://example.com/media" {
+        if !command.contains("--extract-audio")
+            || !command.contains("--continue")
+            || !command.contains("--self-check-feature")
+            || command.last != "https://example.com/media" {
             failures.append("composable command builder")
         }
         let progressTemplate = command.firstIndex(of: "--progress-template").flatMap { index in
@@ -150,6 +211,13 @@ enum SelfCheck {
             || preparedCommand.last != "https://example.com/media" {
             failures.append("download dependencies and temporary files")
         }
+        let partialDirectory = YTDLPService.partialDirectory(
+            jobID: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            configuration: configuration
+        )
+        if partialDirectory.path != "/tmp/MediaHarborSelfCheck/.MediaHarbor/Partial/00000000-0000-0000-0000-000000000001" {
+            failures.append("persistent partial download directory")
+        }
 
         let wordConfiguration = DownloadConfiguration(
             outputDirectory: "/tmp/MediaHarborSelfCheck",
@@ -158,7 +226,7 @@ enum SelfCheck {
             downloadSubtitles: true,
             includeAutomaticSubtitles: false,
             subtitleLanguages: "ja",
-            subtitleFormat: "rtf",
+            subtitleFormat: "docx",
             sponsorBlock: false,
             browserCookies: "None",
             includePlaylist: false
@@ -175,7 +243,7 @@ enum SelfCheck {
             stageSubtitles: true
         )
         if !wordCommand.contains("srt")
-            || wordCommand.contains("rtf")
+            || wordCommand.contains("docx")
             || !wordCommand.contains("subtitle:/tmp/MediaHarborSelfCheck/word") {
             failures.append("Word subtitle staging")
         }
@@ -190,10 +258,11 @@ enum SelfCheck {
         字幕 &amp; transcript
         """
         let transcript = SubtitleDocumentExporter.transcriptParagraphs(fromSRT: srt)
-        let rtf = SubtitleDocumentExporter.rtfDocument(title: "Example", paragraphs: transcript)
+        let documentXML = SubtitleDocumentExporter.documentXML(title: "Example & Notes", paragraphs: transcript)
         if transcript != ["こんにちは", "字幕 & transcript"]
-            || !rtf.hasPrefix("{\\rtf1")
-            || !rtf.contains("\\u") {
+            || !documentXML.contains("<w:document")
+            || !documentXML.contains("Example &amp; Notes")
+            || !documentXML.contains("こんにちは") {
             failures.append("Word subtitle conversion")
         }
         let documentCheckDirectory = FileManager.default.temporaryDirectory
@@ -202,19 +271,54 @@ enum SelfCheck {
             let stagingDirectory = documentCheckDirectory.appendingPathComponent("staging", isDirectory: true)
             let outputDirectory = documentCheckDirectory.appendingPathComponent("output", isDirectory: true)
             try FileManager.default.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
+            let emptyExports = try SubtitleDocumentExporter.exportDOCXDocuments(
+                from: stagingDirectory,
+                to: outputDirectory
+            )
+            if !emptyExports.isEmpty {
+                failures.append("empty Word subtitle export")
+            }
+            do {
+                try YTDLPService.validateSubtitleDocumentResult(
+                    quality: .video(height: 1080),
+                    shouldExportSubtitleDocument: true,
+                    exportedDocuments: emptyExports
+                )
+            } catch {
+                failures.append("optional Word subtitle export")
+            }
+            do {
+                try YTDLPService.validateSubtitleDocumentResult(
+                    quality: .subtitles,
+                    shouldExportSubtitleDocument: true,
+                    exportedDocuments: emptyExports
+                )
+                failures.append("required Word subtitle export")
+            } catch let error as YTDLPError {
+                if error.localizedDescription != SubtitleDocumentExporter.noSubtitlesMessage {
+                    failures.append("required Word subtitle export message")
+                }
+            } catch {
+                failures.append("required Word subtitle export error")
+            }
             try srt.write(
                 to: stagingDirectory.appendingPathComponent("Example.ja.srt"),
                 atomically: true,
                 encoding: .utf8
             )
-            let exports = try SubtitleDocumentExporter.exportRTFDocuments(
+            let exports = try SubtitleDocumentExporter.exportDOCXDocuments(
                 from: stagingDirectory,
                 to: outputDirectory
             )
             if exports.count != 1
-                || exports.first?.pathExtension != "rtf"
+                || exports.first?.pathExtension != "docx"
                 || !FileManager.default.fileExists(atPath: exports[0].path) {
                 failures.append("Word subtitle file export")
+            }
+            if let fixturePath = ProcessInfo.processInfo.environment["MEDIAHARBOR_DOCX_FIXTURE"] {
+                let fixtureURL = URL(fileURLWithPath: fixturePath)
+                try? FileManager.default.removeItem(at: fixtureURL)
+                try FileManager.default.copyItem(at: exports[0], to: fixtureURL)
             }
         } catch {
             failures.append("Word subtitle file export: \(error.localizedDescription)")
@@ -235,6 +339,16 @@ enum SelfCheck {
             }
         } catch {
             failures.append("media JSON decoding: \(error.localizedDescription)")
+        }
+
+        let playlistJSON = #"{"_type":"playlist","id":"45426","entries":[{"id":"767230","title":"原版","webpage_url":"https://www.bilibili.com/bangumi/play/ep767230","formats":[{"format_id":"1","height":360}]},{"id":"767358","title":"中文版","formats":[{"format_id":"2","height":360}]}]}"#
+        do {
+            let info = try YTDLPService.decodeMediaInfo(from: Data(playlistJSON.utf8))
+            if info.id != "767230" || info.title != "原版" || info.qualityChoices.first != .video(height: 360) {
+                failures.append("playlist media selection")
+            }
+        } catch {
+            failures.append("playlist media selection: \(error.localizedDescription)")
         }
 
         let subtitleConfiguration = DownloadConfiguration(

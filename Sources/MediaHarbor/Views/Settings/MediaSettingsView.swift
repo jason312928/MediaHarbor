@@ -22,7 +22,7 @@ struct MediaSettingsView: View {
                     Text("SRT").tag("srt")
                     Text("WebVTT").tag("vtt")
                     Text("ASS").tag("ass")
-                    Text(L10n.text("word_rtf", language)).tag("rtf")
+                    Text(L10n.text("word_docx", language)).tag("docx")
                     Text(L10n.text("original_best", language)).tag("best")
                 }
                 .disabled(!subtitlesEnabled)
@@ -36,6 +36,9 @@ struct MediaSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            if subtitleFormat == "rtf" { subtitleFormat = "docx" }
+        }
     }
 
     private var subtitlesEnabled: Bool { downloadSubtitles || embedSubtitles }

@@ -38,6 +38,16 @@ struct MediaHarborApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var cliTask: Task<Void, Never>?
+    private var signalSources: [DispatchSourceSignal] = []
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        if AgentCLIParser.isCLIInvocation(arguments) {
+            NSApp.setActivationPolicy(.prohibited)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         if CommandLine.arguments.contains("--self-test") {
             Task.detached(priority: .userInitiated) {
@@ -52,9 +62,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchSemaphore(value: 0).wait()
             return
         }
+
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        if AgentCLIParser.isCLIInvocation(arguments) {
+            NSApp.windows.forEach { $0.close() }
+            let runner = AgentCLIRunner()
+            installSignalHandlers(runner: runner)
+            cliTask = Task {
+                let status = await runner.run(arguments: arguments)
+                exit(status)
+            }
+            return
+        }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    private func installSignalHandlers(runner: AgentCLIRunner) {
+        for signalNumber in [SIGINT, SIGTERM] {
+            signal(signalNumber, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
+            source.setEventHandler { [weak self] in
+                self?.cliTask?.cancel()
+                Task { await runner.cancel() }
+            }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 }
 

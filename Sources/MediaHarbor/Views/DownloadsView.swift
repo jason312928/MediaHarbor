@@ -3,126 +3,252 @@ import SwiftUI
 struct DownloadsView: View {
     let store: DownloadStore
     @Environment(\.appLanguage) private var language
+    @State private var searchText = ""
+    @State private var statusFilter = DownloadStatusFilter.all
+    @State private var sortOrder = DownloadSortOrder.newest
+
+    private var visibleJobs: [DownloadJob] {
+        store.jobs
+            .filter { job in
+                statusFilter.includes(job.status)
+                    && (searchText.isEmpty
+                        || job.title.localizedCaseInsensitiveContains(searchText)
+                        || job.sourceName.localizedCaseInsensitiveContains(searchText))
+            }
+            .sorted(by: sortOrder.areInIncreasingOrder)
+    }
 
     var body: some View {
         @Bindable var store = store
         Group {
             if store.jobs.isEmpty {
-                ContentUnavailableView {
-                    Label(L10n.text("no_downloads", language), systemImage: "arrow.down.circle")
-                } description: {
-                    Text(L10n.text("no_downloads_desc", language))
-                } actions: {
-                    Button(L10n.text("find_media", language)) { store.selection = .discover }
-                }
+                emptyState
             } else {
-                HSplitView {
-                    List(selection: $store.selectedJobID) {
-                        ForEach(store.jobs) { job in
-                            DownloadRow(job: job)
-                                .tag(job.id)
-                                .contextMenu {
-                                    if job.status.isActive {
-                                        Button(L10n.text("cancel", language), role: .destructive) { store.cancel(jobID: job.id) }
-                                    }
-                                    if job.outputPath != nil {
-                                        Button(L10n.text("show_finder", language)) { store.reveal(job) }
-                                    }
-                                }
-                        }
-                    }
-                    .listStyle(.inset)
-                    .frame(minWidth: 420, idealWidth: 580)
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        taskColumn(selection: $store.selectedJobID)
+                            .frame(maxWidth: .infinity)
+                            .frame(maxHeight: .infinity, alignment: .top)
 
-                    JobDetailView(store: store, job: store.selectedJob)
-                        .frame(minWidth: 260, idealWidth: 320)
+                        Divider()
+
+                        DownloadJobDetailView(store: store, job: store.selectedJob)
+                            .frame(width: detailWidth(for: geometry.size.width))
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .clipped()
+                    }
                 }
             }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(L10n.text("clear_finished", language), systemImage: "checkmark.circle.badge.xmark") { store.clearCompleted() }
-                    .disabled(!store.jobs.contains { [.completed, .failed, .cancelled].contains($0.status) })
+                Button(L10n.text("clear_finished", language), systemImage: "checkmark.circle.badge.xmark") {
+                    store.clearCompleted()
+                }
+                .disabled(!store.jobs.contains { [.completed, .failed, .cancelled].contains($0.status) })
             }
         }
-        .onAppear { if store.selectedJobID == nil { store.selectedJobID = store.jobs.first?.id } }
+        .onAppear {
+            selectFirstVisibleJobIfNeeded()
+            store.refreshOutputAvailability()
+        }
+        .onChange(of: visibleJobs.map(\.id)) { _, _ in selectFirstVisibleJobIfNeeded() }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label(L10n.text("no_downloads", language), systemImage: "arrow.down.circle")
+        } description: {
+            Text(L10n.text("no_downloads_desc", language))
+        } actions: {
+            Button(L10n.text("find_media", language)) { store.selection = .discover }
+        }
+    }
+
+    private func taskColumn(selection: Binding<UUID?>) -> some View {
+        VStack(spacing: 0) {
+            DownloadToolbar(
+                searchText: $searchText,
+                statusFilter: $statusFilter,
+                sortOrder: $sortOrder
+            )
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.bar)
+
+            Divider()
+
+            if visibleJobs.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(visibleJobs) { job in
+                            Button {
+                                selection.wrappedValue = job.id
+                            } label: {
+                                DownloadJobCard(
+                                    job: job,
+                                    isSelected: selection.wrappedValue == job.id,
+                                    isFileMissing: store.outputIsMissing(job)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                if job.status.isActive {
+                                    Button(L10n.text("cancel", language), role: .destructive) {
+                                        store.cancel(jobID: job.id)
+                                    }
+                                }
+                                if store.outputExists(job) {
+                                    Button(L10n.text("show_finder", language)) { store.reveal(job) }
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+
+            Divider()
+            Text(L10n.text("download_item_count", language, visibleJobs.count))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func selectFirstVisibleJobIfNeeded() {
+        guard !visibleJobs.contains(where: { $0.id == store.selectedJobID }) else { return }
+        store.selectedJobID = visibleJobs.first?.id
+    }
+
+    private func detailWidth(for availableWidth: CGFloat) -> CGFloat {
+        min(420, max(300, availableWidth * 0.36))
     }
 }
 
-private struct DownloadRow: View {
-    let job: DownloadJob
+private struct DownloadToolbar: View {
+    @Binding var searchText: String
+    @Binding var statusFilter: DownloadStatusFilter
+    @Binding var sortOrder: DownloadSortOrder
     @Environment(\.appLanguage) private var language
 
     var body: some View {
         HStack(spacing: 12) {
-            RemoteThumbnail(urlString: job.thumbnail, refererURLString: job.sourceURL, contentMode: .fill, placeholderSymbol: "play.rectangle")
-            .frame(width: 88, height: 50)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(job.title).fontWeight(.medium).lineLimit(1)
-                    Spacer()
-                    Text(job.qualityTitle).font(.caption.monospaced()).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(L10n.text("search_downloads", language), text: $searchText)
+                    .textFieldStyle(.plain)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                if job.status.isActive || job.status == .queued {
-                    ProgressView(value: job.progress).progressViewStyle(.linear)
-                }
-                HStack(spacing: 7) {
-                    StatusDot(status: job.status)
-                    Text(job.status == .failed ? (job.detail ?? job.status.localizedTitle(language)) : job.status.localizedTitle(language)).lineLimit(1)
-                    Spacer()
-                    if let speed = job.speed, speed != "NA" { Text(speed) }
-                    if let eta = job.eta, eta != "NA" { Text(L10n.text("eta", language, eta)) }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 12)
+            .frame(minWidth: 190, maxWidth: .infinity, minHeight: 34, maxHeight: 34)
+            .background(.background.opacity(0.55), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(.separator.opacity(0.5))
+            }
+
+            Menu {
+                ForEach(DownloadStatusFilter.allCases) { filter in
+                    Button {
+                        statusFilter = filter
+                    } label: {
+                        if statusFilter == filter {
+                            Label(filter.localizedTitle(language), systemImage: "checkmark")
+                        } else {
+                            Text(filter.localizedTitle(language))
+                        }
+                    }
+                }
+            } label: {
+                Label(statusFilter.localizedTitle(language), systemImage: "line.3.horizontal.decrease")
+                    .lineLimit(1)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+
+            Menu {
+                ForEach(DownloadSortOrder.allCases) { order in
+                    Button {
+                        sortOrder = order
+                    } label: {
+                        if sortOrder == order {
+                            Label(order.localizedTitle(language), systemImage: "checkmark")
+                        } else {
+                            Text(order.localizedTitle(language))
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+                    .frame(width: 24, height: 24)
+            }
+            .menuStyle(.borderlessButton)
+            .help(L10n.text("sort_downloads", language))
         }
-        .padding(.vertical, 6)
     }
 }
 
-private struct JobDetailView: View {
-    let store: DownloadStore
-    let job: DownloadJob?
-    @Environment(\.appLanguage) private var language
+private enum DownloadStatusFilter: String, CaseIterable, Identifiable {
+    case all, active, completed, failed
 
-    var body: some View {
-        if let job {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    RemoteThumbnail(urlString: job.thumbnail, refererURLString: job.sourceURL)
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+    var id: String { rawValue }
 
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(job.title).font(.title3.bold())
-                        Text(job.sourceName).foregroundStyle(.secondary)
-                    }
+    func includes(_ status: DownloadStatus) -> Bool {
+        switch self {
+        case .all: true
+        case .active: status.isActive || status == .queued
+        case .completed: status == .completed
+        case .failed: status == .failed || status == .cancelled
+        }
+    }
 
-                    VStack(spacing: 10) {
-                        LabeledContent(L10n.text("status", language), value: job.status.localizedTitle(language))
-                        LabeledContent(L10n.text("format", language), value: job.qualityTitle)
-                        LabeledContent(L10n.text("progress", language), value: job.progress.formatted(.percent.precision(.fractionLength(0))))
-                        if let speed = job.speed { LabeledContent(L10n.text("speed", language), value: speed) }
-                    }
-                    .font(.callout)
+    func localizedTitle(_ language: AppLanguage) -> String {
+        L10n.text("download_filter_\(rawValue)", language)
+    }
+}
 
-                    if job.status.isActive {
-                        Button(L10n.text("cancel_download", language), role: .destructive) { store.cancel(jobID: job.id) }
-                            .frame(maxWidth: .infinity)
-                    } else if job.outputPath != nil {
-                        Button(L10n.text("show_finder", language), systemImage: "folder") { store.reveal(job) }
-                            .buttonStyle(.borderedProminent)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(22)
-            }
-        } else {
-            ContentUnavailableView(L10n.text("select_download", language), systemImage: "sidebar.right")
+private enum DownloadSortOrder: String, CaseIterable, Identifiable {
+    case newest, status
+
+    var id: String { rawValue }
+
+    func areInIncreasingOrder(_ lhs: DownloadJob, _ rhs: DownloadJob) -> Bool {
+        switch self {
+        case .newest: return lhs.createdAt > rhs.createdAt
+        case .status:
+            if lhs.status.sortPriority == rhs.status.sortPriority { return lhs.createdAt > rhs.createdAt }
+            return lhs.status.sortPriority < rhs.status.sortPriority
+        }
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        L10n.text("download_sort_\(rawValue)", language)
+    }
+}
+
+private extension DownloadStatus {
+    var sortPriority: Int {
+        switch self {
+        case .downloading, .processing, .preparing: 0
+        case .queued: 1
+        case .failed: 2
+        case .completed: 3
+        case .cancelled: 4
         }
     }
 }

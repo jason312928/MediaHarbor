@@ -2,6 +2,7 @@
 /.build/
 /dist/
 /.swiftpm/
+/.codex/
 /*.xcodeproj/
 xcuserdata/
 *.xcuserstate

@@ -16,8 +16,9 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 - 自动安装和更新官方 `yt-dlp_macos`
 - 支持链接拖放、剪贴板分析、键盘快捷键、菜单栏进度和 Finder 定位
 - 缩略图会保持横向或竖向媒体的原始比例，并兼容需要来源页请求头的站点
-- 支持视频清晰度、纯音频和仅字幕下载；可识别人工/自动字幕、筛选语言、输出 SRT/VTT/ASS 或 Word RTF 文档，并选择保留独立字幕文件或嵌入视频
+- 支持视频清晰度、纯音频和仅字幕下载；可识别人工/自动字幕、筛选语言、输出 SRT/VTT/ASS 或 Microsoft Word DOCX 文档，并选择保留独立字幕文件或嵌入视频
 - 自动定位常见安装位置的 FFmpeg，并在任务结束后清理临时处理文件
+- 提供面向 Codex、Claude Code 和其他 Agent 的 JSONL 命令行接口，支持能力发现、分析、下载、进度与可靠退出码
 - 支持播放列表、媒体信息、浏览器 Cookie 和 SponsorBlock；登录或受限内容可直接读取常用浏览器 Cookie
 - 下载队列提供实时进度、速度、ETA、取消、通知和本地历史记录
 - 无账户、无广告、无分析追踪
@@ -47,8 +48,20 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.3.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.4.0 ./script/build_and_run.sh --package
 ```
+
+## Codex / Claude Code 接口
+
+Agent 可以直接调用与 App 相同的下载服务：
+
+```bash
+swift run MediaHarbor capabilities
+swift run MediaHarbor download "视频链接" --quality 1080p --output "$PWD/downloads" --no-app-settings
+swift run MediaHarbor download "视频链接" --quality subtitles --sub-format docx --sub-langs "zh-Hans,en"
+```
+
+已安装的 App 可通过 `/Applications/MediaHarbor.app/Contents/MacOS/MediaHarbor` 直接调用。标准输出为 JSONL；完整参数、事件协议和退出码见 [Agent 接口文档](Documentation/AGENT_INTERFACE.md)。
 
 打包模式会在 `dist/` 中生成当前架构的版本化 DMG 和 ZIP。
 
