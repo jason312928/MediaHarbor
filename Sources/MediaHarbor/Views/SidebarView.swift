@@ -20,6 +20,13 @@ struct SidebarView: View {
                                     .padding(.vertical, 2)
                                     .background(.blue, in: Capsule())
                                     .foregroundStyle(.white)
+                            } else if destination == .favorites, !store.favorites.isEmpty {
+                                Text(store.favorites.count, format: .number)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary, in: Capsule())
                             }
                         }
                     } icon: {

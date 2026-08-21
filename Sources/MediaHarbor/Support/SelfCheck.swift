@@ -105,6 +105,28 @@ enum SelfCheck {
             if cappedStore.load().jobs.count != 200 {
                 failures.append("download history limit")
             }
+
+            let favoritesURL = historyCheckDirectory.appendingPathComponent("favorites.json")
+            let favoritesStore = FavoritesStore(url: favoritesURL)
+            let favorite = FavoriteItem(job: first, favoritedAt: Date(timeIntervalSince1970: 1_710_000_000))
+            try favoritesStore.save([favorite])
+            let loadedFavorites = favoritesStore.load()
+            if !loadedFavorites.canSave
+                || loadedFavorites.items.count != 1
+                || loadedFavorites.items.first?.id != first.id
+                || loadedFavorites.items.first?.favoritedAt != favorite.favoritedAt {
+                failures.append("favorites persistence")
+            }
+
+            let mixedFavorites = try JSONSerialization.data(withJSONObject: [
+                try JSONSerialization.jsonObject(with: encoder.encode(favorite)),
+                ["job": ["id": "invalid"]]
+            ])
+            try mixedFavorites.write(to: favoritesURL, options: .atomic)
+            let recoveredFavorites = favoritesStore.load()
+            if recoveredFavorites.items.map(\.id) != [first.id] || !recoveredFavorites.canSave {
+                failures.append("lossy favorites recovery")
+            }
         } catch {
             failures.append("download history persistence: \(error.localizedDescription)")
         }

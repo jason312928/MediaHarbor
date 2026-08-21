@@ -20,6 +20,7 @@ struct ContentView: View {
                     case .discover: DiscoverView(store: store)
                     case .queue: DownloadsView(store: store)
                     case .history: HistoryView(store: store)
+                    case .favorites: FavoritesView(store: store)
                     }
                 }
                 .navigationTitle(store.selection.localizedTitle(language))
@@ -32,16 +33,18 @@ struct ContentView: View {
                     }
                     .help(L10n.text("paste_help", language))
 
-                    Button {
-                        if store.showInspector {
-                            store.showInspector = false
-                        } else {
-                            presentInspector()
+                    if store.selection == .discover {
+                        Button {
+                            if store.showInspector {
+                                store.showInspector = false
+                            } else {
+                                presentInspector()
+                            }
+                        } label: {
+                            Label(L10n.text("inspector", language), systemImage: "sidebar.trailing")
                         }
-                    } label: {
-                        Label(L10n.text("inspector", language), systemImage: "sidebar.trailing")
+                        .help(L10n.text("inspector_help", language))
                     }
-                    .help(L10n.text("inspector_help", language))
                 }
             }
             .background(WindowAccessor(reference: windowReference).frame(width: 0, height: 0))
@@ -50,7 +53,7 @@ struct ContentView: View {
                 applyPanelConstraints(for: width)
             }
             .onChange(of: store.showInspector) { _, isPresented in
-                if isPresented, !isExpandingWindow,
+                if store.selection == .discover, isPresented, !isExpandingWindow,
                    WindowSizing.needsExpansion(windowReference.window, sidebar: isSidebarVisible, inspector: true) {
                     store.showInspector = false
                     presentInspector()
@@ -86,6 +89,7 @@ struct ContentView: View {
     }
 
     private var isSidebarVisible: Bool { columnVisibility != .detailOnly }
+    private var isInspectorVisible: Bool { store.selection == .discover && store.showInspector }
 
     private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
         Binding(
@@ -97,7 +101,7 @@ struct ContentView: View {
                 } else {
                     expandWindow(
                         sidebar: true,
-                        inspector: store.showInspector,
+                        inspector: isInspectorVisible,
                         anchor: .trailingEdge
                     ) {
                         columnVisibility = requestedVisibility
@@ -134,12 +138,12 @@ struct ContentView: View {
 
     private func applyPanelConstraints(for width: CGFloat) {
         guard !isExpandingWindow else { return }
-        if store.showInspector {
+        if isInspectorVisible {
             let required = WindowSizing.requiredContentWidth(sidebar: isSidebarVisible, inspector: true)
             if width + 1 < required { store.showInspector = false }
         }
         if isSidebarVisible {
-            let required = WindowSizing.requiredContentWidth(sidebar: true, inspector: store.showInspector)
+            let required = WindowSizing.requiredContentWidth(sidebar: true, inspector: isInspectorVisible)
             if width + 1 < required { columnVisibility = .detailOnly }
         }
         if width < WindowSizing.detailWidth {

@@ -1,7 +1,7 @@
 import Foundation
 
 enum SidebarDestination: String, CaseIterable, Identifiable {
-    case discover, queue, history
+    case discover, queue, history, favorites
 
     var id: String { rawValue }
 
@@ -10,6 +10,7 @@ enum SidebarDestination: String, CaseIterable, Identifiable {
         case .discover: "Discover"
         case .queue: "Downloads"
         case .history: "History"
+        case .favorites: "Favorites"
         }
     }
 
@@ -18,6 +19,7 @@ enum SidebarDestination: String, CaseIterable, Identifiable {
         case .discover: "sparkle.magnifyingglass"
         case .queue: "arrow.down.circle"
         case .history: "clock.arrow.circlepath"
+        case .favorites: "star"
         }
     }
 }
@@ -211,6 +213,14 @@ struct DownloadJob: Codable, Identifiable, Sendable {
     var eta: String?
     var detail: String?
     var outputPath: String?
+    var completedAt: Date? = nil
+}
+
+struct FavoriteItem: Codable, Identifiable, Sendable {
+    var job: DownloadJob
+    let favoritedAt: Date
+
+    var id: UUID { job.id }
 }
 
 struct DownloadConfiguration: Sendable {

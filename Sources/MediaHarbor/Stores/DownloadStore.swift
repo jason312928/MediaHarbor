@@ -117,7 +117,10 @@ final class DownloadStore {
     var selectedQuality: QualityChoice?
     var jobs: [DownloadJob] = []
     var history: [DownloadJob] = []
+    var favorites: [FavoriteItem] = []
     var selectedJobID: UUID?
+    var selectedHistoryID: UUID?
+    var selectedFavoriteID: UUID?
     var isAnalyzing = false
     var isInstallingTool = false
     var toolVersion: String?
@@ -128,17 +131,26 @@ final class DownloadStore {
 
     private let service = YTDLPService()
     private let historyStore: DownloadHistoryStore
+    private let favoritesStore: FavoritesStore
     private let outputFileMonitor = OutputFileMonitor()
     private var canSaveHistory: Bool
+    private var canSaveFavorites: Bool
     private var analysisTask: Task<Void, Never>?
     private var downloadTasks: [UUID: Task<Void, Never>] = [:]
     private var pendingLoginRecovery: BrowserLoginRecovery?
 
-    init(historyStore: DownloadHistoryStore = DownloadHistoryStore()) {
+    init(
+        historyStore: DownloadHistoryStore = DownloadHistoryStore(),
+        favoritesStore: FavoritesStore = FavoritesStore()
+    ) {
         self.historyStore = historyStore
+        self.favoritesStore = favoritesStore
         let loadedHistory = historyStore.load()
         history = loadedHistory.jobs
         canSaveHistory = loadedHistory.canSave
+        let loadedFavorites = favoritesStore.load()
+        favorites = loadedFavorites.items
+        canSaveFavorites = loadedFavorites.canSave
         outputFileMonitor.onChange = { [weak self] in self?.refreshOutputAvailability() }
         refreshOutputAvailability()
         Task { await refreshToolStatus() }
@@ -147,10 +159,49 @@ final class DownloadStore {
     var activeJobs: [DownloadJob] { jobs.filter { $0.status.isActive || $0.status == .queued } }
     var completedJobs: [DownloadJob] { jobs.filter { $0.status == .completed } }
     var selectedJob: DownloadJob? { jobs.first { $0.id == selectedJobID } }
+    var selectedHistoryJob: DownloadJob? { history.first { $0.id == selectedHistoryID } }
+    var selectedFavoriteJob: DownloadJob? { favorites.first { $0.id == selectedFavoriteID }?.job }
+
+    func isFavorite(_ job: DownloadJob) -> Bool {
+        favorites.contains { $0.id == job.id }
+    }
+
+    func toggleFavorite(_ job: DownloadJob) {
+        if let index = favorites.firstIndex(where: { $0.id == job.id }) {
+            favorites.remove(at: index)
+            if selectedFavoriteID == job.id { selectedFavoriteID = favorites.first?.id }
+        } else {
+            favorites.insert(FavoriteItem(job: job, favoritedAt: Date()), at: 0)
+            selectedFavoriteID = job.id
+        }
+        saveFavorites()
+        refreshOutputAvailability()
+    }
+
+    func deleteHistoryRecord(jobID: UUID) {
+        history.removeAll { $0.id == jobID }
+        if selectedHistoryID == jobID { selectedHistoryID = history.first?.id }
+        saveHistory()
+        refreshOutputAvailability()
+    }
+
+    func clearHistory() {
+        history.removeAll()
+        selectedHistoryID = nil
+        saveHistory()
+        refreshOutputAvailability()
+    }
+
+    func downloadAgain(_ job: DownloadJob) {
+        urlText = job.sourceURL
+        selection = .discover
+        analyze()
+    }
 
     func pasteAndAnalyze() {
         if let value = NSPasteboard.general.string(forType: .string) {
             urlText = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            selection = .discover
             analyze()
         }
     }
@@ -319,7 +370,7 @@ final class DownloadStore {
     }
 
     func refreshOutputAvailability() {
-        let recordedOutputs = (jobs + history).filter { $0.outputPath != nil }
+        let recordedOutputs = (jobs + history + favorites.map(\.job)).filter { $0.outputPath != nil }
         missingOutputIDs = Set(recordedOutputs.filter { !outputExists($0) }.map(\.id))
         outputFileMonitor.watch(outputPaths: recordedOutputs.compactMap(\.outputPath))
     }
@@ -394,12 +445,15 @@ final class DownloadStore {
                     $0.progress = 1
                     $0.detail = "Saved"
                     $0.outputPath = outputPath
+                    $0.completedAt = Date()
                 }
                 if let completed = jobs.first(where: { $0.id == jobID }) {
                     history.removeAll { $0.id == completed.id }
                     history.insert(completed, at: 0)
-                    if canSaveHistory {
-                        try? historyStore.save(history)
+                    saveHistory()
+                    if let favoriteIndex = favorites.firstIndex(where: { $0.id == completed.id }) {
+                        favorites[favoriteIndex].job = completed
+                        saveFavorites()
                     }
                     notifyCompletion(completed)
                     refreshOutputAvailability()
@@ -418,6 +472,26 @@ final class DownloadStore {
     private func update(_ id: UUID, mutation: (inout DownloadJob) -> Void) {
         guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
         mutation(&jobs[index])
+    }
+
+    private func saveHistory() {
+        guard canSaveHistory else { return }
+        do {
+            try historyStore.save(history)
+        } catch {
+            canSaveHistory = false
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveFavorites() {
+        guard canSaveFavorites else { return }
+        do {
+            try favoritesStore.save(favorites)
+        } catch {
+            canSaveFavorites = false
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func qualityChoice(for job: DownloadJob) -> QualityChoice? {
