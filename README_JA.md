@@ -6,11 +6,20 @@ MediaHarbor は、[yt-dlp](https://github.com/yt-dlp/yt-dlp) を基盤に開発�
 
 [最新リリースをダウンロード](https://github.com/jason312928/MediaHarbor/releases/latest) · [yt-dlp対応サイトを見る](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
 
+## インターフェース
+
+MediaHarborはネイティブな3カラムmacOSデザインを採用しています。サイドバー、コンテンツ、折りたたみ可能な詳細パネルがウインドウサイズに合わせて連動し、ダウンロード設定と主要操作をすぐに利用できます。
+
+| 検索とダウンロード設定 | お気に入りグループとメディア詳細 |
+| --- | --- |
+| ![MediaHarborの検索画面](Documentation/Screenshots/discover.png) | ![MediaHarborのお気に入り画面](Documentation/Screenshots/favorites-library.png) |
+
 ## 主な機能
 
 - macOS 14以降に対応したネイティブSwiftUIインターフェース
 - macOS 26ではLiquid Glass、以前のバージョンではシステム素材を使用
 - サイドバーとインスペクターに合わせてウインドウを自動拡張し、画面スペースが不足する場合は副カラムを自動的に折りたたみ
+- 検索、ダウンロード、履歴、お気に入りで共通のアニメーション付き折りたたみ詳細パネル
 - 英語、簡体字中国語、繁体字中国語、日本語を即時切り替え
 - YouTube、TikTok、Bilibili、Instagram、X / Twitter、Facebook、Twitch、Vimeo、SoundCloud、Redditなど、yt-dlpが対応する幅広いメディアサイトをサポート
 - 公式`yt-dlp_macos`をオンデマンドでインストール・更新
@@ -20,6 +29,8 @@ MediaHarbor は、[yt-dlp](https://github.com/yt-dlp/yt-dlp) を基盤に開発�
 - 一般的なインストール先からFFmpegを自動検出し、各ジョブの完了後に一時処理ファイルをクリーンアップ
 - プレイリスト、メタデータ、ブラウザCookie、SponsorBlockに対応。ログインや制限付きメディアには一般的なブラウザのCookieを利用可能
 - 進捗、速度、ETA、キャンセル、通知、ローカル履歴を備えたダウンロードキュー
+- 履歴の検索、メディア種別フィルター、並べ替え、日付グループ、個別削除に対応。お気に入りではリンクを保持し、独自グループで整理可能
+- ディスクから削除されたダウンロードファイルを自動検出し、再ダウンロード、開く、Finder表示、パスのコピー、削除を状況に応じて提供
 - アカウント、広告、分析、トラッキングなし
 
 ## 動作要件

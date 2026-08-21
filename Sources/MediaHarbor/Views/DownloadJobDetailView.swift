@@ -1,9 +1,16 @@
 import SwiftUI
 import AppKit
 
+enum DownloadDetailContext {
+    case download
+    case history
+    case favorite
+}
+
 struct DownloadJobDetailView: View {
     let store: DownloadStore
     let job: DownloadJob?
+    var context: DownloadDetailContext = .download
     @Environment(\.appLanguage) private var language
     @Environment(\.scenePhase) private var scenePhase
     @State private var outputAvailability = OutputAvailability.unknown
@@ -40,7 +47,7 @@ struct DownloadJobDetailView: View {
                 ContentUnavailableView(L10n.text("select_download", language), systemImage: "sidebar.right")
             }
         }
-        .task(id: job?.outputPath) { refreshOutputAvailability() }
+        .task(id: detailRefreshID) { refreshOutputAvailability() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshOutputAvailability() }
         }
@@ -93,12 +100,23 @@ struct DownloadJobDetailView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 8)
+                    Button { store.toggleFavorite(job) } label: {
+                        Image(systemName: store.isFavorite(job) ? "star.fill" : "star")
+                            .foregroundStyle(store.isFavorite(job) ? .yellow : .secondary)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(.plain)
+                    .help(L10n.text(store.isFavorite(job) ? "remove_favorite" : "add_favorite", language))
                     if job.status == .completed {
                         DownloadStatusBadge(status: job.status)
                     }
                 }
             }
         }
+    }
+
+    private var detailRefreshID: String {
+        "\(job?.id.uuidString ?? "none")|\(job?.outputPath ?? "")"
     }
 
     private func progressSection(_ job: DownloadJob) -> some View {
@@ -176,6 +194,52 @@ struct DownloadJobDetailView: View {
     @ViewBuilder
     private func actions(_ job: DownloadJob) -> some View {
         VStack(spacing: 8) {
+            if context != .download {
+                Button {
+                    store.downloadAgain(job)
+                } label: {
+                    Label(L10n.text("download_again", language), systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+
+            if store.isFavorite(job) {
+                Menu {
+                    Button {
+                        store.moveFavorite(jobID: job.id, to: nil)
+                    } label: {
+                        if store.favoriteCollection(for: job) == nil {
+                            Label(L10n.text("ungrouped", language), systemImage: "checkmark")
+                        } else {
+                            Text(L10n.text("ungrouped", language))
+                        }
+                    }
+                    ForEach(store.favoriteCollections) { collection in
+                        Button {
+                            store.moveFavorite(jobID: job.id, to: collection.id)
+                        } label: {
+                            if store.favoriteCollection(for: job)?.id == collection.id {
+                                Label(collection.name, systemImage: "checkmark")
+                            } else {
+                                Text(collection.name)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(
+                        store.favoriteCollection(for: job)?.name ?? L10n.text("ungrouped", language),
+                        systemImage: "folder"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .menuStyle(.borderlessButton)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 7))
+            }
+
             if [.cancelled, .failed].contains(job.status) {
                 Button {
                     store.resume(jobID: job.id)
@@ -242,6 +306,24 @@ struct DownloadJobDetailView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+            }
+
+            if context == .history {
+                Button(role: .destructive) {
+                    store.deleteHistoryRecord(jobID: job.id)
+                } label: {
+                    Label(L10n.text("delete_history_record", language), systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            } else if context == .favorite {
+                Button(role: .destructive) {
+                    store.toggleFavorite(job)
+                } label: {
+                    Label(L10n.text("remove_favorite", language), systemImage: "star.slash")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
 
         }

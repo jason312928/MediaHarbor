@@ -6,11 +6,20 @@ MediaHarbor is a modern, native media downloader for macOS powered by [yt-dlp](h
 
 [Download the latest release](https://github.com/jason312928/MediaHarbor/releases/latest) · [Browse yt-dlp supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
 
+## Interface preview
+
+MediaHarbor uses a native three-column macOS design. Its sidebar, content area, and collapsible detail panel adapt together as the window changes, keeping download options and common actions easy to reach.
+
+| Discover and download options | Favorite groups and media details |
+| --- | --- |
+| ![MediaHarbor Discover view](Documentation/Screenshots/discover.png) | ![MediaHarbor Favorites view](Documentation/Screenshots/favorites-library.png) |
+
 ## Highlights
 
 - Native SwiftUI interface for macOS 14 and later
 - Liquid Glass on macOS 26 and adaptive system materials on earlier releases
 - Adaptive window expansion for the sidebar and inspector, with automatic column collapse when screen space is limited
+- An animated, collapsible detail panel shared by Discover, Downloads, History, and Favorites
 - Live switching between English, Simplified Chinese, Traditional Chinese, and Japanese
 - Works with the broad yt-dlp supported-sites catalog, including YouTube, TikTok, Bilibili, Instagram, X / Twitter, Facebook, Twitch, Vimeo, SoundCloud, and Reddit
 - Installs and updates the official `yt-dlp_macos` release on demand
@@ -21,6 +30,8 @@ MediaHarbor is a modern, native media downloader for macOS powered by [yt-dlp](h
 - A JSONL command-line interface for Codex, Claude Code, and other agents, with capability discovery, analysis, downloads, progress events, and reliable exit codes
 - Playlists, metadata, browser cookies, and SponsorBlock; signed-in or restricted media can use cookies directly from common browsers
 - Download queue with progress, speed, ETA, cancellation, notifications, and local history
+- Searchable history with media filters, sorting, date groups, and per-record cleanup; Favorites add persistent source links and custom groups
+- Automatic detection of downloaded files removed from disk, with contextual actions to download again, open, reveal in Finder, copy the path, or delete
 - No accounts, ads, analytics, or bundled tracking
 
 ## Requirements
