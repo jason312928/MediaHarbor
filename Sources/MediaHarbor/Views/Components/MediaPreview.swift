@@ -48,6 +48,28 @@ struct MediaPreview: View {
                 }
             }
 
+            if isBilibiliLimited {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "person.crop.circle.badge.arrow.right")
+                        .foregroundStyle(.blue)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(L10n.text("bilibili_login_hint", language))
+                            .font(.callout)
+                        Text(L10n.text("bilibili_login_detail", language))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button(L10n.text("bilibili_login", language), systemImage: "arrow.up.right.square") {
+                            store.openBrowserLogin(for: media.webpageURL ?? store.urlText)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.blue.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+            }
+
             ViewThatFits(in: .horizontal) {
                 HStack {
                     readyLabel
@@ -75,6 +97,13 @@ struct MediaPreview: View {
                 if loadedThumbnailAspectRatio != clamped { loadedThumbnailAspectRatio = clamped }
             }
         )
+    }
+
+    private var isBilibiliLimited: Bool {
+        guard let url = media.webpageURL ?? Optional(store.urlText),
+              SupportedPlatform.matching(url)?.id == "bilibili" else { return false }
+        let highestVideoHeight = media.formats.compactMap(\.height).max() ?? media.height ?? 0
+        return highestVideoHeight > 0 && highestVideoHeight <= 480
     }
 
     private var horizontalThumbnailSize: CGSize {

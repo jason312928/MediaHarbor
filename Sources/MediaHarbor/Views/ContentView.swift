@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     let store: DownloadStore
     @Environment(\.appLanguage) private var language
+    @Environment(\.scenePhase) private var scenePhase
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var windowReference = WeakWindowReference()
     @State private var isExpandingWindow = false
@@ -55,13 +56,31 @@ struct ContentView: View {
                     presentInspector()
                 }
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    store.resumeAfterBrowserLogin()
+                    store.refreshOutputAvailability()
+                }
+            }
             .alert("MediaHarbor", isPresented: Binding(
                 get: { store.errorMessage != nil },
-                set: { if !$0 { store.errorMessage = nil } }
+                set: { if !$0 { store.dismissError() } }
             )) {
-                Button(L10n.text("ok", language), role: .cancel) { store.errorMessage = nil }
+                if let recovery = store.loginRecovery {
+                    Button(L10n.text("open_browser_login", language, recovery.browserName)) {
+                        store.openBrowserLogin()
+                    }
+                }
+                Button(
+                    L10n.text(store.loginRecovery == nil ? "ok" : "cancel", language),
+                    role: .cancel
+                ) { store.dismissError() }
             } message: {
-                Text(store.errorMessage ?? L10n.text("unknown_error", language))
+                if let recovery = store.loginRecovery {
+                    Text("\(store.errorMessage ?? L10n.text("unknown_error", language))\n\n\(L10n.text("browser_login_help", language, recovery.browserName))")
+                } else {
+                    Text(store.errorMessage ?? L10n.text("unknown_error", language))
+                }
             }
         }
     }

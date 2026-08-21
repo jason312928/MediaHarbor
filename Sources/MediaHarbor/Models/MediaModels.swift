@@ -152,6 +152,7 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
     var title: String {
         switch self {
         case .video(let height):
+            if height == .max { return "Best" }
             if height >= 2160 { return "4K" }
             if height >= 1440 { return "2K" }
             return "\(height)p"
@@ -162,7 +163,7 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
 
     var detail: String {
         switch self {
-        case .video(let height): height >= 2160 ? "Ultra HD" : height >= 1080 ? "High definition" : "Compact"
+        case .video(let height): height == .max ? "Best available" : height >= 2160 ? "Ultra HD" : height >= 1080 ? "High definition" : "Compact"
         case .audio: "M4A · audio only"
         case .subtitles: "Subtitle files only"
         }
@@ -179,6 +180,7 @@ enum QualityChoice: Hashable, Sendable, Identifiable {
     var formatSelector: String {
         switch self {
         case .video(let height):
+            if height == .max { return "bestvideo+bestaudio/best" }
             return "bestvideo[height<=\(height)]+bestaudio/best[height<=\(height)]"
         case .audio:
             return "bestaudio/best"
@@ -226,6 +228,7 @@ struct DownloadConfiguration: Sendable {
     static func current(defaults: UserDefaults = .standard) -> DownloadConfiguration {
         let defaultOutput = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads").path
+        let savedSubtitleFormat = defaults.string(forKey: "subtitleFormat") ?? "srt"
         return DownloadConfiguration(
             outputDirectory: defaults.string(forKey: "outputDirectory") ?? defaultOutput,
             embedMetadata: defaults.object(forKey: "embedMetadata") as? Bool ?? true,
@@ -233,7 +236,7 @@ struct DownloadConfiguration: Sendable {
             downloadSubtitles: defaults.bool(forKey: "downloadSubtitles"),
             includeAutomaticSubtitles: defaults.object(forKey: "includeAutomaticSubtitles") as? Bool ?? true,
             subtitleLanguages: defaults.string(forKey: "subtitleLanguages") ?? "en,zh-Hans,zh-Hant",
-            subtitleFormat: defaults.string(forKey: "subtitleFormat") ?? "srt",
+            subtitleFormat: savedSubtitleFormat == "rtf" ? "docx" : savedSubtitleFormat,
             sponsorBlock: defaults.bool(forKey: "sponsorBlock"),
             browserCookies: defaults.string(forKey: "browserCookies") ?? "None",
             includePlaylist: defaults.bool(forKey: "includePlaylist")

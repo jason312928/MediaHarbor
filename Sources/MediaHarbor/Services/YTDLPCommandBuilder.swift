@@ -41,6 +41,7 @@ private struct CoreDownloadArguments: DownloadArgumentContributor {
         [
             "--newline",
             "--progress",
+            "--continue",
             "--progress-template", "download:download:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
             "--print", "after_move:filepath",
             "--paths", request.configuration.outputDirectory,
@@ -84,11 +85,12 @@ private struct SubtitleArguments: DownloadArgumentContributor {
 
         let format = request.configuration.subtitleFormat
         if format != "best" {
-            result += ["--sub-format", "best", "--convert-subs", format == "rtf" ? "srt" : format]
+            let conversionFormat = format == "docx" || format == "rtf" ? "srt" : format
+            result += ["--sub-format", "best", "--convert-subs", conversionFormat]
         }
         if request.configuration.embedSubtitles && !subtitleOnly {
             result.append("--embed-subs")
-            if !request.configuration.downloadSubtitles && format != "rtf" {
+            if !request.configuration.downloadSubtitles && format != "docx" && format != "rtf" {
                 result += ["--compat-options", "no-keep-subs"]
             }
         }

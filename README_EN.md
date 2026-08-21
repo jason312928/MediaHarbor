@@ -16,8 +16,9 @@ MediaHarbor is a modern, native media downloader for macOS powered by [yt-dlp](h
 - Installs and updates the official `yt-dlp_macos` release on demand
 - URL drag and drop, clipboard analysis, keyboard commands, menu bar progress, and Finder reveal
 - Aspect-ratio-aware thumbnails for landscape and portrait media, including sites that require source-page request headers
-- Video, audio-only, and subtitle-only downloads with discovered manual/automatic caption languages, SRT/VTT/ASS or Word RTF output, separate files, and embedding
+- Video, audio-only, and subtitle-only downloads with discovered manual/automatic caption languages, SRT/VTT/ASS or Microsoft Word DOCX output, separate files, and embedding
 - Automatic FFmpeg discovery in common installation locations and cleanup of temporary processing files after each job
+- A JSONL command-line interface for Codex, Claude Code, and other agents, with capability discovery, analysis, downloads, progress events, and reliable exit codes
 - Playlists, metadata, browser cookies, and SponsorBlock; signed-in or restricted media can use cookies directly from common browsers
 - Download queue with progress, speed, ETA, cancellation, notifications, and local history
 - No accounts, ads, analytics, or bundled tracking
@@ -47,8 +48,20 @@ cd MediaHarbor
 swift build
 ./script/test.sh
 ./script/build_and_run.sh --verify
-MEDIAHARBOR_VERSION=1.3.0 ./script/build_and_run.sh --package
+MEDIAHARBOR_VERSION=1.4.0 ./script/build_and_run.sh --package
 ```
+
+## Codex / Claude Code interface
+
+Agents can invoke the same download service used by the App:
+
+```bash
+swift run MediaHarbor capabilities
+swift run MediaHarbor download "MEDIA_URL" --quality 1080p --output "$PWD/downloads" --no-app-settings
+swift run MediaHarbor download "MEDIA_URL" --quality subtitles --sub-format docx --sub-langs "zh-Hans,en"
+```
+
+For an installed App, invoke `/Applications/MediaHarbor.app/Contents/MacOS/MediaHarbor` directly. Standard output uses JSON Lines. See the [agent interface specification](Documentation/AGENT_INTERFACE.md) for all options, events, and exit codes.
 
 Package mode creates versioned DMG and ZIP artifacts for the current architecture in `dist/`.
 
