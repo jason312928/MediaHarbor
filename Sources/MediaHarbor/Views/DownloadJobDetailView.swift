@@ -205,6 +205,41 @@ struct DownloadJobDetailView: View {
                 .controlSize(.large)
             }
 
+            if store.isFavorite(job) {
+                Menu {
+                    Button {
+                        store.moveFavorite(jobID: job.id, to: nil)
+                    } label: {
+                        if store.favoriteCollection(for: job) == nil {
+                            Label(L10n.text("ungrouped", language), systemImage: "checkmark")
+                        } else {
+                            Text(L10n.text("ungrouped", language))
+                        }
+                    }
+                    ForEach(store.favoriteCollections) { collection in
+                        Button {
+                            store.moveFavorite(jobID: job.id, to: collection.id)
+                        } label: {
+                            if store.favoriteCollection(for: job)?.id == collection.id {
+                                Label(collection.name, systemImage: "checkmark")
+                            } else {
+                                Text(collection.name)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(
+                        store.favoriteCollection(for: job)?.name ?? L10n.text("ungrouped", language),
+                        systemImage: "folder"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .menuStyle(.borderlessButton)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 7))
+            }
+
             if [.cancelled, .failed].contains(job.status) {
                 Button {
                     store.resume(jobID: job.id)

@@ -6,11 +6,20 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 
 [下载最新版本](https://github.com/jason312928/MediaHarbor/releases/latest) · [查看 yt-dlp 支持的网站](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
 
+## 界面预览
+
+MediaHarbor 采用原生三栏式 macOS 设计。侧边栏、内容区和可折叠详情栏会随窗口空间协调变化，下载参数与常用操作始终保持清晰可见。
+
+| 发现与下载选项 | 收藏分组与媒体详情 |
+| --- | --- |
+| ![MediaHarbor 发现页面](Documentation/Screenshots/discover.png) | ![MediaHarbor 收藏页面](Documentation/Screenshots/favorites-library.png) |
+
 ## 主要特点
 
 - 面向 macOS 14 及更高版本的原生 SwiftUI 界面
 - 在 macOS 26 使用 Liquid Glass，旧系统使用自适应系统材质
 - 窗口会根据侧边栏和检查器自适应扩展，屏幕空间不足时自动收起次要栏
+- 发现、下载、历史记录和收藏页面共享带动画的可折叠详情栏
 - 应用内即时切换英文、简体中文、繁体中文和日文
 - 支持 yt-dlp 覆盖的众多媒体网站，包括 YouTube、TikTok、哔哩哔哩、Instagram、X / Twitter、Facebook、Twitch、Vimeo、SoundCloud 和 Reddit
 - 自动安装和更新官方 `yt-dlp_macos`
@@ -21,6 +30,8 @@ MediaHarbor 是一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 开发的
 - 提供面向 Codex、Claude Code 和其他 Agent 的 JSONL 命令行接口，支持能力发现、分析、下载、进度与可靠退出码
 - 支持播放列表、媒体信息、浏览器 Cookie 和 SponsorBlock；登录或受限内容可直接读取常用浏览器 Cookie
 - 下载队列提供实时进度、速度、ETA、取消、通知和本地历史记录
+- 历史记录支持搜索、媒体类型筛选、排序、按日期分组和单条清理；收藏支持自定义分组，并可长期保留来源链接
+- 自动识别已从磁盘移除的下载文件，并提供重新下载、打开、Finder 定位、复制路径和删除等上下文操作
 - 无账户、无广告、无分析追踪
 
 ## 系统要求

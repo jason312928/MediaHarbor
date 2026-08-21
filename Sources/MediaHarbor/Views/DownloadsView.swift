@@ -30,13 +30,20 @@ struct DownloadsView: View {
                             .frame(maxWidth: .infinity)
                             .frame(maxHeight: .infinity, alignment: .top)
 
-                        Divider()
+                        if store.showDetailPanel {
+                            HStack(spacing: 0) {
+                                Divider()
 
-                        DownloadJobDetailView(store: store, job: store.selectedJob)
-                            .frame(width: detailWidth(for: geometry.size.width))
-                            .frame(maxHeight: .infinity, alignment: .top)
-                            .clipped()
+                                DownloadJobDetailView(store: store, job: store.selectedJob)
+                                    .frame(width: detailWidth(for: geometry.size.width))
+                                    .frame(maxHeight: .infinity, alignment: .top)
+                                    .clipped()
+                            }
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
                     }
+                    .animation(.easeInOut(duration: 0.22), value: store.showDetailPanel)
+                    .clipped()
                 }
             }
         }

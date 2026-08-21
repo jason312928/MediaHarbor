@@ -33,18 +33,10 @@ struct ContentView: View {
                     }
                     .help(L10n.text("paste_help", language))
 
-                    if store.selection == .discover {
-                        Button {
-                            if store.showInspector {
-                                store.showInspector = false
-                            } else {
-                                presentInspector()
-                            }
-                        } label: {
-                            Label(L10n.text("inspector", language), systemImage: "sidebar.trailing")
-                        }
-                        .help(L10n.text("inspector_help", language))
+                    Button(action: toggleTrailingPanel) {
+                        Label(L10n.text("inspector", language), systemImage: "sidebar.trailing")
                     }
+                    .help(L10n.text("inspector_help", language))
                 }
             }
             .background(WindowAccessor(reference: windowReference).frame(width: 0, height: 0))
@@ -56,9 +48,17 @@ struct ContentView: View {
                 if store.selection == .discover, isPresented, !isExpandingWindow,
                    WindowSizing.needsExpansion(windowReference.window, sidebar: isSidebarVisible, inspector: true) {
                     store.showInspector = false
-                    presentInspector()
+                    presentTrailingPanel()
                 }
             }
+            .onChange(of: store.showDetailPanel) { _, isPresented in
+                if store.selection != .discover, isPresented, !isExpandingWindow,
+                   WindowSizing.needsExpansion(windowReference.window, sidebar: isSidebarVisible, inspector: true) {
+                    store.showDetailPanel = false
+                    presentTrailingPanel()
+                }
+            }
+            .onChange(of: store.selection) { _, _ in applyPanelConstraints(for: geometry.size.width) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
                     store.resumeAfterBrowserLogin()
@@ -89,7 +89,9 @@ struct ContentView: View {
     }
 
     private var isSidebarVisible: Bool { columnVisibility != .detailOnly }
-    private var isInspectorVisible: Bool { store.selection == .discover && store.showInspector }
+    private var isTrailingPanelVisible: Bool {
+        store.selection == .discover ? store.showInspector : store.showDetailPanel
+    }
 
     private var columnVisibilityBinding: Binding<NavigationSplitViewVisibility> {
         Binding(
@@ -101,7 +103,7 @@ struct ContentView: View {
                 } else {
                     expandWindow(
                         sidebar: true,
-                        inspector: isInspectorVisible,
+                        inspector: isTrailingPanelVisible,
                         anchor: .trailingEdge
                     ) {
                         columnVisibility = requestedVisibility
@@ -111,9 +113,25 @@ struct ContentView: View {
         )
     }
 
-    private func presentInspector() {
+    private func toggleTrailingPanel() {
+        if isTrailingPanelVisible {
+            setTrailingPanelVisible(false)
+        } else {
+            presentTrailingPanel()
+        }
+    }
+
+    private func presentTrailingPanel() {
         expandWindow(sidebar: isSidebarVisible, inspector: true, anchor: .leadingEdge) {
-            store.showInspector = true
+            setTrailingPanelVisible(true)
+        }
+    }
+
+    private func setTrailingPanelVisible(_ isVisible: Bool) {
+        if store.selection == .discover {
+            store.showInspector = isVisible
+        } else {
+            store.showDetailPanel = isVisible
         }
     }
 
@@ -138,17 +156,17 @@ struct ContentView: View {
 
     private func applyPanelConstraints(for width: CGFloat) {
         guard !isExpandingWindow else { return }
-        if isInspectorVisible {
+        if isTrailingPanelVisible {
             let required = WindowSizing.requiredContentWidth(sidebar: isSidebarVisible, inspector: true)
-            if width + 1 < required { store.showInspector = false }
+            if width + 1 < required { setTrailingPanelVisible(false) }
         }
         if isSidebarVisible {
-            let required = WindowSizing.requiredContentWidth(sidebar: true, inspector: isInspectorVisible)
+            let required = WindowSizing.requiredContentWidth(sidebar: true, inspector: isTrailingPanelVisible)
             if width + 1 < required { columnVisibility = .detailOnly }
         }
         if width < WindowSizing.detailWidth {
             columnVisibility = .detailOnly
-            store.showInspector = false
+            setTrailingPanelVisible(false)
         }
     }
 }

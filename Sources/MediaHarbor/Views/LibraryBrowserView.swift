@@ -17,6 +17,7 @@ struct LibraryBrowserView: View {
     @State private var mediaFilter = LibraryMediaFilter.all
     @State private var sortOrder = LibrarySortOrder.newest
     @State private var confirmsClearingHistory = false
+    @State private var collectionEditor: FavoriteCollectionEditor?
 
     private var records: [LibraryRecord] {
         let source: [LibraryRecord]
@@ -27,13 +28,14 @@ struct LibraryBrowserView: View {
             }
         case .favorites:
             source = store.favorites.map {
-                LibraryRecord(job: $0.job, libraryDate: $0.favoritedAt)
+                LibraryRecord(job: $0.job, libraryDate: $0.favoritedAt, collectionID: $0.collectionID)
             }
         }
 
         return source
             .filter { record in
                 mediaFilter.includes(record.job)
+                    && favoriteCollectionIncludes(record)
                     && (query.isEmpty
                         || record.job.title.localizedCaseInsensitiveContains(query)
                         || record.job.sourceName.localizedCaseInsensitiveContains(query)
@@ -64,18 +66,23 @@ struct LibraryBrowserView: View {
                         libraryColumn
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        if showsDetail(for: geometry.size.width) {
-                            Divider()
-                            DownloadJobDetailView(
-                                store: store,
-                                job: selectedJob,
-                                context: mode == .history ? .history : .favorite
-                            )
-                            .frame(width: detailWidth(for: geometry.size.width))
-                            .frame(maxHeight: .infinity, alignment: .top)
-                            .clipped()
+                        if store.showDetailPanel, showsDetail(for: geometry.size.width) {
+                            HStack(spacing: 0) {
+                                Divider()
+                                DownloadJobDetailView(
+                                    store: store,
+                                    job: selectedJob,
+                                    context: mode == .history ? .history : .favorite
+                                )
+                                .frame(width: detailWidth(for: geometry.size.width))
+                                .frame(maxHeight: .infinity, alignment: .top)
+                                .clipped()
+                            }
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                         }
                     }
+                    .animation(.easeInOut(duration: 0.22), value: store.showDetailPanel)
+                    .clipped()
                 }
             }
         }
@@ -94,6 +101,11 @@ struct LibraryBrowserView: View {
             Button(L10n.text("cancel", language), role: .cancel) {}
         } message: {
             Text(L10n.text("clear_history_detail", language))
+        }
+        .sheet(item: $collectionEditor) { editor in
+            FavoriteCollectionEditorSheet(editor: editor) { name in
+                saveCollection(editor, name: name)
+            }
         }
     }
 
@@ -114,9 +126,38 @@ struct LibraryBrowserView: View {
 
             Divider()
 
+            if mode == .favorites {
+                FavoriteCollectionsBar(
+                    collections: store.favoriteCollections,
+                    items: store.favorites,
+                    selection: Binding(
+                        get: { store.favoriteCollectionSelection },
+                        set: { store.favoriteCollectionSelection = $0 }
+                    ),
+                    onCreate: { collectionEditor = .create },
+                    onRename: { collectionEditor = .rename($0) },
+                    onDelete: deleteCollection
+                )
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(.bar)
+
+                Divider()
+            }
+
             if records.isEmpty {
-                ContentUnavailableView.search(text: query)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Group {
+                    if query.isEmpty, mode == .favorites, store.favoriteCollectionSelection != .all {
+                        ContentUnavailableView(
+                            L10n.text("no_group_items", language),
+                            systemImage: "folder",
+                            description: Text(L10n.text("no_group_items_desc", language))
+                        )
+                    } else {
+                        ContentUnavailableView.search(text: query)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 20) {
@@ -210,6 +251,13 @@ struct LibraryBrowserView: View {
                 Label(L10n.text("show_finder", language), systemImage: "folder")
             }
         }
+        if store.isFavorite(job) {
+            Menu {
+                favoriteCollectionMenuItems(job)
+            } label: {
+                Label(L10n.text("move_to_group", language), systemImage: "folder")
+            }
+        }
         Divider()
         Button(role: .destructive) {
             if mode == .history { store.deleteHistoryRecord(jobID: job.id) }
@@ -239,6 +287,54 @@ struct LibraryBrowserView: View {
         }
     }
 
+    private func favoriteCollectionIncludes(_ record: LibraryRecord) -> Bool {
+        guard mode == .favorites else { return true }
+        switch store.favoriteCollectionSelection {
+        case .all: return true
+        case .ungrouped: return record.collectionID == nil
+        case .collection(let id): return record.collectionID == id
+        }
+    }
+
+    @ViewBuilder
+    private func favoriteCollectionMenuItems(_ job: DownloadJob) -> some View {
+        Button {
+            store.moveFavorite(jobID: job.id, to: nil)
+        } label: {
+            if store.favoriteCollection(for: job) == nil {
+                Label(L10n.text("ungrouped", language), systemImage: "checkmark")
+            } else {
+                Text(L10n.text("ungrouped", language))
+            }
+        }
+        ForEach(store.favoriteCollections) { collection in
+            Button {
+                store.moveFavorite(jobID: job.id, to: collection.id)
+            } label: {
+                if store.favoriteCollection(for: job)?.id == collection.id {
+                    Label(collection.name, systemImage: "checkmark")
+                } else {
+                    Text(collection.name)
+                }
+            }
+        }
+    }
+
+    private func saveCollection(_ editor: FavoriteCollectionEditor, name: String) {
+        switch editor {
+        case .create:
+            if let id = store.createFavoriteCollection(named: name) {
+                store.favoriteCollectionSelection = .collection(id)
+            }
+        case .rename(let collection):
+            store.renameFavoriteCollection(id: collection.id, to: name)
+        }
+    }
+
+    private func deleteCollection(_ collection: FavoriteCollection) {
+        store.deleteFavoriteCollection(id: collection.id)
+    }
+
     private func selectFirstVisibleRecordIfNeeded() {
         guard !records.contains(where: { $0.id == selectedID.wrappedValue }) else { return }
         selectedID.wrappedValue = records.first?.id
@@ -256,6 +352,7 @@ struct LibraryBrowserView: View {
 private struct LibraryRecord: Identifiable {
     let job: DownloadJob
     let libraryDate: Date
+    var collectionID: UUID? = nil
     var id: UUID { job.id }
 }
 

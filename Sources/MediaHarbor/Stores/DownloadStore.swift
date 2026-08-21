@@ -118,6 +118,8 @@ final class DownloadStore {
     var jobs: [DownloadJob] = []
     var history: [DownloadJob] = []
     var favorites: [FavoriteItem] = []
+    var favoriteCollections: [FavoriteCollection] = []
+    var favoriteCollectionSelection = FavoriteCollectionSelection.all
     var selectedJobID: UUID?
     var selectedHistoryID: UUID?
     var selectedFavoriteID: UUID?
@@ -127,6 +129,7 @@ final class DownloadStore {
     var errorMessage: String?
     var loginRecovery: BrowserLoginRecovery?
     var showInspector = true
+    var showDetailPanel = true
     var missingOutputIDs: Set<UUID> = []
 
     private let service = YTDLPService()
@@ -150,6 +153,7 @@ final class DownloadStore {
         canSaveHistory = loadedHistory.canSave
         let loadedFavorites = favoritesStore.load()
         favorites = loadedFavorites.items
+        favoriteCollections = loadedFavorites.collections
         canSaveFavorites = loadedFavorites.canSave
         outputFileMonitor.onChange = { [weak self] in self?.refreshOutputAvailability() }
         refreshOutputAvailability()
@@ -171,11 +175,60 @@ final class DownloadStore {
             favorites.remove(at: index)
             if selectedFavoriteID == job.id { selectedFavoriteID = favorites.first?.id }
         } else {
-            favorites.insert(FavoriteItem(job: job, favoritedAt: Date()), at: 0)
+            favorites.insert(FavoriteItem(job: job, favoritedAt: Date(), collectionID: nil), at: 0)
             selectedFavoriteID = job.id
         }
         saveFavorites()
         refreshOutputAvailability()
+    }
+
+    @discardableResult
+    func createFavoriteCollection(named name: String) -> UUID? {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+        if let existing = favoriteCollections.first(where: {
+            $0.name.caseInsensitiveCompare(normalized) == .orderedSame
+        }) {
+            return existing.id
+        }
+        let collection = FavoriteCollection(id: UUID(), name: normalized, createdAt: Date())
+        favoriteCollections.append(collection)
+        saveFavorites()
+        return collection.id
+    }
+
+    func renameFavoriteCollection(id: UUID, to name: String) {
+        let normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty,
+              !favoriteCollections.contains(where: {
+                  $0.id != id && $0.name.caseInsensitiveCompare(normalized) == .orderedSame
+              }),
+              let index = favoriteCollections.firstIndex(where: { $0.id == id }) else { return }
+        favoriteCollections[index].name = normalized
+        saveFavorites()
+    }
+
+    func deleteFavoriteCollection(id: UUID) {
+        favoriteCollections.removeAll { $0.id == id }
+        for index in favorites.indices where favorites[index].collectionID == id {
+            favorites[index].collectionID = nil
+        }
+        if favoriteCollectionSelection == .collection(id) {
+            favoriteCollectionSelection = .ungrouped
+        }
+        saveFavorites()
+    }
+
+    func moveFavorite(jobID: UUID, to collectionID: UUID?) {
+        guard collectionID == nil || favoriteCollections.contains(where: { $0.id == collectionID }),
+              let index = favorites.firstIndex(where: { $0.id == jobID }) else { return }
+        favorites[index].collectionID = collectionID
+        saveFavorites()
+    }
+
+    func favoriteCollection(for job: DownloadJob) -> FavoriteCollection? {
+        guard let collectionID = favorites.first(where: { $0.id == job.id })?.collectionID else { return nil }
+        return favoriteCollections.first { $0.id == collectionID }
     }
 
     func deleteHistoryRecord(jobID: UUID) {
@@ -487,7 +540,7 @@ final class DownloadStore {
     private func saveFavorites() {
         guard canSaveFavorites else { return }
         do {
-            try favoritesStore.save(favorites)
+            try favoritesStore.save(items: favorites, collections: favoriteCollections)
         } catch {
             canSaveFavorites = false
             errorMessage = error.localizedDescription

@@ -108,13 +108,24 @@ enum SelfCheck {
 
             let favoritesURL = historyCheckDirectory.appendingPathComponent("favorites.json")
             let favoritesStore = FavoritesStore(url: favoritesURL)
-            let favorite = FavoriteItem(job: first, favoritedAt: Date(timeIntervalSince1970: 1_710_000_000))
-            try favoritesStore.save([favorite])
+            let collection = FavoriteCollection(
+                id: UUID(),
+                name: "Language Study",
+                createdAt: Date(timeIntervalSince1970: 1_705_000_000)
+            )
+            let favorite = FavoriteItem(
+                job: first,
+                favoritedAt: Date(timeIntervalSince1970: 1_710_000_000),
+                collectionID: collection.id
+            )
+            try favoritesStore.save(items: [favorite], collections: [collection])
             let loadedFavorites = favoritesStore.load()
             if !loadedFavorites.canSave
                 || loadedFavorites.items.count != 1
                 || loadedFavorites.items.first?.id != first.id
-                || loadedFavorites.items.first?.favoritedAt != favorite.favoritedAt {
+                || loadedFavorites.items.first?.favoritedAt != favorite.favoritedAt
+                || loadedFavorites.items.first?.collectionID != collection.id
+                || loadedFavorites.collections != [collection] {
                 failures.append("favorites persistence")
             }
 
@@ -124,8 +135,10 @@ enum SelfCheck {
             ])
             try mixedFavorites.write(to: favoritesURL, options: .atomic)
             let recoveredFavorites = favoritesStore.load()
-            if recoveredFavorites.items.map(\.id) != [first.id] || !recoveredFavorites.canSave {
-                failures.append("lossy favorites recovery")
+            if recoveredFavorites.items.map(\.id) != [first.id]
+                || !recoveredFavorites.collections.isEmpty
+                || !recoveredFavorites.canSave {
+                failures.append("legacy favorites migration")
             }
         } catch {
             failures.append("download history persistence: \(error.localizedDescription)")

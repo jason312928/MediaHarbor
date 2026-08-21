@@ -219,8 +219,21 @@ struct DownloadJob: Codable, Identifiable, Sendable {
 struct FavoriteItem: Codable, Identifiable, Sendable {
     var job: DownloadJob
     let favoritedAt: Date
+    var collectionID: UUID? = nil
 
     var id: UUID { job.id }
+}
+
+struct FavoriteCollection: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    var name: String
+    let createdAt: Date
+}
+
+enum FavoriteCollectionSelection: Hashable, Sendable {
+    case all
+    case ungrouped
+    case collection(UUID)
 }
 
 struct DownloadConfiguration: Sendable {

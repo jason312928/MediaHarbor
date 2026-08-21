@@ -34,6 +34,7 @@ struct DiscoverView: View {
             DownloadInspector(store: store)
                 .inspectorColumnWidth(min: 230, ideal: 270, max: 320)
         }
+        .animation(.easeInOut(duration: 0.22), value: store.showInspector)
     }
 }
 

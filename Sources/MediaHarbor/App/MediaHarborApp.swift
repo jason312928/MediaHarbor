@@ -115,7 +115,13 @@ private struct HarborCommands: Commands {
                 .keyboardShortcut("2", modifiers: [.command])
             Button(L10n.text("clear_finished", language)) { store.clearCompleted() }
                 .disabled(store.jobs.isEmpty)
-            Button(L10n.text("toggle_inspector", language)) { store.showInspector.toggle() }
+            Button(L10n.text("toggle_inspector", language)) {
+                if store.selection == .discover {
+                    store.showInspector.toggle()
+                } else {
+                    store.showDetailPanel.toggle()
+                }
+            }
                 .keyboardShortcut("i", modifiers: [.command, .option])
         }
     }

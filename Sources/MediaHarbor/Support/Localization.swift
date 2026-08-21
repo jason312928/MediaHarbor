@@ -51,7 +51,7 @@ enum L10n {
     }
 
     private static let english: [String: String] = [
-        "discover": "Discover", "downloads": "Downloads", "history": "History", "favorites": "Favorites", "library": "Library", "engine": "Engine",
+        "discover": "Discover", "downloads": "Downloads", "history": "History", "favorites": "Favorites", "library": "Library", "engine": "Engine", "settings": "Settings",
         "not_installed": "Not installed", "paste_url": "Paste URL", "paste_help": "Paste a media URL and analyze it",
         "inspector": "Inspector", "inspector_help": "Toggle inspector", "ok": "OK", "unknown_error": "Unknown error",
         "bring_media": "Bring media ashore", "paste_supported": "Paste a link from any website supported by yt-dlp.", "analyze": "Analyze",
@@ -75,6 +75,7 @@ enum L10n {
         "no_history": "No history yet", "history_desc": "Completed downloads are remembered locally.", "search_history": "Search history",
         "no_favorites": "No favorites yet", "favorites_desc": "Keep useful media links here, even after clearing download history.", "search_favorites": "Search favorites",
         "add_favorite": "Add to Favorites", "remove_favorite": "Remove Favorite", "download_again": "Download Again", "delete_history_record": "Delete History Record", "clear_history": "Clear History", "clear_history_confirm": "Clear all history?", "clear_history_detail": "Favorite items are kept. This does not delete downloaded files.",
+        "favorite_groups": "Favorite groups", "new_group": "New Group", "rename_group": "Rename Group", "delete_group": "Delete Group", "group_name": "Group name", "all_favorites": "All Favorites", "ungrouped": "Ungrouped", "move_to_group": "Move to Group", "group_item_count": "%d items", "no_group_items": "This group is empty", "no_group_items_desc": "Move a favorite here from its menu or detail panel.", "create": "Create", "save": "Save",
         "library_filter_all": "All", "library_filter_video": "Video", "library_filter_audio": "Audio", "library_filter_subtitles": "Subtitles", "library_sort_newest": "Newest", "library_sort_oldest": "Oldest", "library_sort_title": "Title", "library_item_count": "%d items", "media_type": "Media type", "today": "Today", "this_week": "This Week", "earlier": "Earlier",
         "save_to": "Save downloads to", "choose": "Choose…", "defaults": "Defaults", "general": "General", "app_language": "App language",
         "subtitles": "Subtitles", "download_embed_subtitles": "Download and embed subtitles", "languages": "Languages",
@@ -98,7 +99,7 @@ enum L10n {
     ]
 
     private static let simplifiedChinese: [String: String] = [
-        "discover": "发现", "downloads": "下载", "history": "历史记录", "favorites": "收藏", "library": "资料库", "engine": "下载引擎",
+        "discover": "发现", "downloads": "下载", "history": "历史记录", "favorites": "收藏", "library": "资料库", "engine": "下载引擎", "settings": "设置",
         "not_installed": "尚未安装", "paste_url": "粘贴链接", "paste_help": "粘贴媒体链接并进行分析", "inspector": "检查器", "inspector_help": "显示或隐藏检查器", "ok": "好", "unknown_error": "未知错误",
         "bring_media": "把喜欢的内容带回来", "paste_supported": "粘贴任意 yt-dlp 支持的网站链接。", "analyze": "分析",
         "install_engine": "安装下载引擎", "install_engine_desc": "MediaHarbor 会直接从 yt-dlp 的 GitHub 官方发行版下载 macOS 程序。它不会存入本仓库，并且可以随时更新。",
@@ -119,6 +120,7 @@ enum L10n {
         "no_history": "暂无历史记录", "history_desc": "已完成的下载只会记录在本机。", "search_history": "搜索历史记录",
         "no_favorites": "暂无收藏", "favorites_desc": "把值得保留的媒体链接收藏在这里，清除历史记录后也不会丢失。", "search_favorites": "搜索收藏",
         "add_favorite": "加入收藏", "remove_favorite": "取消收藏", "download_again": "重新下载", "delete_history_record": "删除历史记录", "clear_history": "清空历史记录", "clear_history_confirm": "清空全部历史记录？", "clear_history_detail": "收藏内容会被保留，也不会删除已经下载的文件。",
+        "favorite_groups": "收藏分组", "new_group": "新建分组", "rename_group": "重命名分组", "delete_group": "删除分组", "group_name": "分组名称", "all_favorites": "全部收藏", "ungrouped": "未分组", "move_to_group": "移动到分组", "group_item_count": "%d 项", "no_group_items": "这个分组还是空的", "no_group_items_desc": "可以从收藏项目菜单或右侧详情面板移动到这里。", "create": "创建", "save": "保存",
         "library_filter_all": "全部", "library_filter_video": "视频", "library_filter_audio": "音频", "library_filter_subtitles": "字幕", "library_sort_newest": "最新优先", "library_sort_oldest": "最早优先", "library_sort_title": "按标题", "library_item_count": "%d 个项目", "media_type": "媒体类型", "today": "今天", "this_week": "本周", "earlier": "更早",
         "save_to": "下载保存位置", "choose": "选择…", "defaults": "默认选项", "general": "通用", "app_language": "应用语言",
         "subtitles": "字幕", "download_embed_subtitles": "下载并嵌入字幕", "languages": "语言", "language_selector_help": "使用逗号分隔 yt-dlp 字幕语言代码。",
@@ -137,7 +139,7 @@ enum L10n {
     ]
 
     private static let traditionalChinese: [String: String] = [
-        "discover": "探索", "downloads": "下載", "history": "歷史記錄", "favorites": "收藏", "library": "資料庫", "engine": "下載引擎", "not_installed": "尚未安裝",
+        "discover": "探索", "downloads": "下載", "history": "歷史記錄", "favorites": "收藏", "library": "資料庫", "engine": "下載引擎", "settings": "設定", "not_installed": "尚未安裝",
         "paste_url": "貼上連結", "paste_help": "貼上媒體連結並進行分析", "inspector": "檢查器", "inspector_help": "顯示或隱藏檢查器", "ok": "好", "unknown_error": "未知錯誤",
         "bring_media": "把喜愛的內容帶回來", "paste_supported": "貼上任意 yt-dlp 支援的網站連結。", "analyze": "分析", "choose_format": "選擇格式",
         "merge_automatically": "自動配對並合併最佳影音串流", "views": "%@ 次觀看", "ready_for": "已就緒：%@", "add_downloads": "加入下載",
@@ -154,6 +156,7 @@ enum L10n {
         "progress": "進度", "speed": "速度", "cancel_download": "取消下載", "select_download": "選擇下載項目", "no_history": "暫無歷史記錄",
         "history_desc": "已完成的下載只會記錄在本機。", "search_history": "搜尋歷史記錄", "no_favorites": "暫無收藏", "favorites_desc": "把值得保留的媒體連結收藏在這裡，清除歷史記錄後也不會遺失。", "search_favorites": "搜尋收藏",
         "add_favorite": "加入收藏", "remove_favorite": "取消收藏", "download_again": "重新下載", "delete_history_record": "刪除歷史記錄", "clear_history": "清空歷史記錄", "clear_history_confirm": "清空全部歷史記錄？", "clear_history_detail": "收藏內容會保留，也不會刪除已下載的檔案。",
+        "favorite_groups": "收藏分組", "new_group": "新增分組", "rename_group": "重新命名分組", "delete_group": "刪除分組", "group_name": "分組名稱", "all_favorites": "全部收藏", "ungrouped": "未分組", "move_to_group": "移動到分組", "group_item_count": "%d 項", "no_group_items": "這個分組還是空的", "no_group_items_desc": "可以從收藏項目選單或右側詳情面板移動到這裡。", "create": "建立", "save": "儲存",
         "library_filter_all": "全部", "library_filter_video": "影片", "library_filter_audio": "音訊", "library_filter_subtitles": "字幕", "library_sort_newest": "最新優先", "library_sort_oldest": "最早優先", "library_sort_title": "依標題", "library_item_count": "%d 個項目", "media_type": "媒體類型", "today": "今天", "this_week": "本週", "earlier": "更早", "save_to": "下載儲存位置", "choose": "選擇…", "defaults": "預設選項",
         "general": "一般", "app_language": "應用程式語言", "subtitles": "字幕", "download_embed_subtitles": "下載並嵌入字幕", "languages": "語言",
         "download_subtitles": "保留獨立字幕檔案", "automatic_subtitles": "包含自動產生字幕", "subtitle_format": "字幕格式", "word_docx": "Microsoft Word（.docx）", "original_best": "原始 / 最佳格式",
@@ -168,7 +171,7 @@ enum L10n {
     ]
 
     private static let japanese: [String: String] = [
-        "discover": "見つける", "downloads": "ダウンロード", "history": "履歴", "favorites": "お気に入り", "library": "ライブラリ", "engine": "エンジン", "not_installed": "未インストール",
+        "discover": "見つける", "downloads": "ダウンロード", "history": "履歴", "favorites": "お気に入り", "library": "ライブラリ", "engine": "エンジン", "settings": "設定", "not_installed": "未インストール",
         "paste_url": "URLをペースト", "paste_help": "メディアURLを貼り付けて解析", "inspector": "インスペクタ", "inspector_help": "インスペクタを切り替える", "ok": "OK",
         "bring_media": "メディアを手元へ", "paste_supported": "yt-dlpが対応するサイトのURLを貼り付けてください。", "analyze": "解析", "choose_format": "形式を選択",
         "merge_automatically": "最適な映像と音声を自動的に結合", "views": "%@ 回視聴", "ready_for": "%@ の準備完了", "add_downloads": "ダウンロードに追加",
@@ -184,6 +187,7 @@ enum L10n {
         "cancel": "キャンセル", "show_finder": "Finderに表示", "clear_finished": "完了項目を消去", "status": "状態", "format": "形式", "progress": "進捗", "speed": "速度",
         "cancel_download": "ダウンロードを中止", "select_download": "ダウンロードを選択", "no_history": "履歴はありません", "search_history": "履歴を検索",
         "no_favorites": "お気に入りはありません", "favorites_desc": "大切なメディアリンクを履歴とは別に保存します。", "search_favorites": "お気に入りを検索", "add_favorite": "お気に入りに追加", "remove_favorite": "お気に入りから削除", "download_again": "再ダウンロード", "delete_history_record": "履歴を削除", "clear_history": "履歴を消去", "clear_history_confirm": "履歴をすべて消去しますか？", "clear_history_detail": "お気に入りとダウンロード済みファイルは削除されません。",
+        "favorite_groups": "お気に入りグループ", "new_group": "新規グループ", "rename_group": "グループ名を変更", "delete_group": "グループを削除", "group_name": "グループ名", "all_favorites": "すべてのお気に入り", "ungrouped": "未分類", "move_to_group": "グループへ移動", "group_item_count": "%d 項目", "no_group_items": "このグループは空です", "no_group_items_desc": "項目メニューまたは詳細パネルから移動できます。", "create": "作成", "save": "保存",
         "library_filter_all": "すべて", "library_filter_video": "動画", "library_filter_audio": "音声", "library_filter_subtitles": "字幕", "library_sort_newest": "新しい順", "library_sort_oldest": "古い順", "library_sort_title": "タイトル", "library_item_count": "%d 項目", "media_type": "メディア種類", "today": "今日", "this_week": "今週", "earlier": "以前",
         "save_to": "保存先", "choose": "選択…", "defaults": "デフォルト", "general": "一般", "app_language": "アプリの言語", "subtitles": "字幕",
         "download_embed_subtitles": "字幕をダウンロードして埋め込む", "languages": "言語", "post_processing": "後処理", "browser_cookies": "ブラウザCookie",
